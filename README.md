@@ -1,332 +1,128 @@
-# Parental Control for Windows
+# نظام الرقابة الأبوية لويندوز — Windows Parental Control
 
-> Based on [robertpin/WindowsParentalControl](https://github.com/robertpin/WindowsParentalControl) (MIT License) with extended parental controls, Telegram bot remote monitoring, per-user Windows restrictions, blocked apps enforcement, and a child countdown overlay.
-
-> **Vibe Coded Disclaimer**
->
-> This application was entirely vibe coded using **Claude Code with Claude Opus 4.6 (High)** and should be treated as such. The code was generated through conversational AI-assisted development — no line was hand-written. While functional and tested on the developer's machine, it has not undergone formal code review, security audit, or extensive QA. Use at your own discretion, review the source before deploying in any sensitive environment, and expect rough edges.
-
-## Download
-
-Download the latest installer (`ParentalControlSetup.exe`) from the [GitHub Releases page](https://github.com/XCES4RX/WindowsParentalControl/releases). Run it as administrator and follow the on-screen instructions.
+> **مبني ومطوّر على مشروع [robertpin/WindowsParentalControl](https://github.com/robertpin/WindowsParentalControl) (برخصة MIT)** مع إضافات متقدمة تشمل التحكم الكامل عبر بوت تلغرام، أخذ لقطات شاشة مباشرة، قيود ويندوز لكل طفل، حظر التطبيقات والألعاب، ومربع عدّ تنازلي عائم على شاشة الطفل.
 
 ---
 
-## What Is This?
+## التحميل والتثبيت السريع
 
-Parental Control is a **Windows desktop application** that lets administrators enforce screen time limits and usage schedules on local Windows user accounts. It consists of two components:
-
-- **Admin UI** — a WPF desktop app where you configure per-user time limits and schedules, view usage, and monitor events.
-- **Background Service** — a Windows Service that runs silently, tracks active sessions, enforces limits, and forcefully logs users off when they exceed their allowed time or fall outside their permitted schedule.
+1. حمّل أحدث ملف تثبيت `ParentalControlSetup.exe` من صفحة **[الإصدارات (Releases)](https://github.com/XCES4RX/WindowsParentalControl/releases)**.
+2. شغّل المثبّت كمسؤول (**Run as Administrator**) واتبع خطوات التثبيت.
+3. تأكد من أن حساب الطفل على ويندوز هو حساب قياسي (**Standard User**) وليس Administrator، لأن حسابات المسؤولين لا تخضع للتقييد.
 
 ---
 
-## Features
+## لقطات من بوت تلغرام والنظام
 
-### User Management
-- Automatically discovers all local Windows user accounts
-- Filters out built-in system accounts (DefaultAccount, WDAGUtilityAccount, Guest)
-- Distinguishes between standard users and administrators
-- Administrator accounts are protected — they cannot be restricted (displayed as read-only in the UI)
-
-### Daily Time Limits
-- Set a maximum number of minutes per day for each user (default: 120 minutes)
-- Usage is tracked in real time, accumulating every 60 seconds
-- Administrators can directly edit a user's current daily usage from the Admin UI (useful for granting extra time or correcting usage)
-- Resets automatically at midnight
-
-### Schedule Windows
-- Define allowed hours for each user (e.g., 08:00 to 22:00)
-- Users are forcefully logged off if they are still logged in when their schedule window closes
-- Login attempts outside the schedule window are denied
-
-### Automatic Enforcement
-- The background service checks all active sessions every 60 seconds
-- If a user exceeds their daily limit, they are immediately logged off
-- If a user is logged in outside their allowed schedule, they are immediately logged off
-- Login attempts are blocked if the user has already exhausted their daily limit or is outside their schedule
-
-### Event & Audit Logging
-All enforcement actions are logged with timestamps, user SIDs, and details:
-
-| Event Type | Description |
+| القائمة الرئيسية للبوت | حالة الجهاز والجلسة النشطة |
 |---|---|
-| `LOGIN` | User logged in successfully |
-| `LOGOUT` | User logged out |
-| `SLEEP` | System entered sleep mode |
-| `WAKE` | System resumed from sleep |
-| `LIMIT_REACHED` | Daily usage limit was reached |
-| `FORCED_LOGOUT` | User was forcefully logged off |
-| `LOGIN_DENIED` | Login attempt was rejected |
-| `CLOCK_TAMPER` | System clock manipulation was detected |
+| ![القائمة الرئيسية لبوت تلغرام](docs/images/telegram-menu.png) | ![حالة الجهاز والجلسة النشطة](docs/images/telegram-status.png) |
 
-### Clock Tamper Detection
-- Detects when the system clock is set backwards (e.g., a user trying to gain extra screen time)
-- Immediately fills the restricted user's daily usage to their maximum allowed minutes, locking them out for the rest of the day
-- Forces the user off the system
-- Logs a `CLOCK_TAMPER` event with timestamps showing the time reversal
+| حدود الاستخدام وتعديل الوقت | طلب وقت إضافي من الطفل (موافقة / رفض) |
+|---|---|
+| ![حدود الاستخدام اليومي](docs/images/telegram-limits.png) | ![طلب وقت إضافي](docs/images/telegram-time-request.png) |
 
-### Sleep/Wake Awareness
-- Usage tracking pauses when the system enters sleep mode
-- Resumes accurately on wake — sleep time is not counted against the user
-- All active session times are flushed to the database before sleep
-- Retroactively detects undetected sleep/hibernate events by identifying gaps in session activity greater than 2 minutes
-
-### Data Retention
-- Events and usage records older than 30 days are automatically deleted
-- Cleanup runs daily at midnight
-- Keeps the database size manageable over time
-
-### Security
-- The `C:\ProgramData\ParentalControl\` directory is locked via ACLs to SYSTEM and Administrators only
-- Restricted users cannot directly access or modify the database
-
-### Service Status Monitoring
-- The admin UI polls the Windows Service status every 5 seconds
-- Displays a green indicator when the service is running, red when it's down
-
-### Windows Restrictions (Per Child)
-- Lock taskbar and disable taskbar settings & right-click menu (`LockTaskbar`, `NoSetTaskbar`, `NoTrayContextMenu`)
-- Block Windows Settings & Control Panel (`NoControlPanel`)
-- Block Task Manager (`DisableTaskMgr`)
-- Block Command Prompt (`DisableCMD`)
-- Enforced automatically per user via `HKEY_USERS\{SID}` on logon and monitor ticks
-
-### Application Blocker
-- Block specific process names per child account (e.g., `robloxplayerbeta`, `discord`, `steam`)
-- Automatically terminates matching processes in the child's session within 5 seconds, logs `APP_BLOCKED`, and alerts via Telegram
-
-### Child Floating Countdown Overlay & Extra Time Requests
-- Lightweight draggable top-right widget (`ParentalControl.Overlay`) showing exact remaining time until the daily limit or allowed schedule ends
-- Includes a **+15m** button so the child can request extra time, sending an interactive Approve/Deny prompt to the parent's Telegram
-- Displays pre-logout warning popups at 5 minutes and 1 minute remaining
-
-### Telegram Bot Remote Control & Alerts
-- Paste a Telegram Bot Token or Bot API URL in **Settings & Telegram**
-- Remote commands & inline buttons: `/status`, `/screenshot` (live interactive desktop capture), `/limits` (increase, decrease, or edit limits & schedules), `/policies`, `/events`, `/block`, `/unblock`, remote screen lock, and remote logoff
-- Instant notifications on login, limit reached, forced logout, clock tampering, blocked apps, and daily summaries
+### سجل الأحداث الفوري عبر تلغرام
+![آخر 10 أحداث](docs/images/telegram-events.jpg)
 
 ---
 
-## Architecture
+## المميزات الرئيسية
 
-```
+### 1. إدارة الوقت والجدول الزمني
+- **حد يومي للاستخدام:** تحديد عدد الدقائق المسموحة يومياً لكل حساب قياسي (تُحسب دقيقة بدقيقة وتُصفَّر تلقائياً عند منتصف الليل).
+- **نوافذ زمنية (Schedule):** تحديد ساعات العمل المسموحة (مثلاً `07:00 - 23:00`) ومنع تسجيل الدخول خارجها.
+- **تنبيه قبل انتهاء الوقت:** إظهار نافذة تحذيرية على شاشة الطفل قبل **5 دقائق** وقبل **دقيقة واحدة** من انتهاء الجلسة لحفظ أعماله.
+- **كشف التلاعب بالساعة:** إذا تم إرجاع ساعة النظام للخلف، يغلق النظام الجلسة فوراً لبقية اليوم ويسجل حدث `CLOCK_TAMPER`.
+
+### 2. مربع العدّ التنازلي العائم للطفل (`ParentalControl.Overlay`)
+- مربع صغير أنيق وشفاف يطفو في زاوية الشاشة (قابل للسحب) ويعرض الوقت المتبقي الفعلي لنهاية الجلسة (الأقل بين المتبقي اليومي ونهاية الجدول).
+- يتغير لونه تلقائياً حسب الوقت المتبقي (أخضر ← برتقالي عند ≤ 15 دقيقة ← أحمر عند ≤ 5 دقائق).
+- يحتوي على زر **`+15m`** ليرسل الطفل طلباً فورياً للوالدين عبر تلغرام للموافقة أو الرفض بضغطة زر.
+
+### 3. قيود ويندوز لكل طفل (Windows Restrictions)
+يمكن تفعيل كل قيد بشكل مستقل لكل حساب طفل من لوحة الإدارة وتُطبَّق تلقائياً عبر `HKEY_USERS\{SID}`:
+- **قفل شريط المهام (`LockTaskbar`):** قفل شريط المهام ومنع إعداداته وقائمة الزر الأيمن.
+- **منع الإعدادات ولوحة التحكم (`NoControlPanel`):** حظر **Windows Settings** و**Control Panel**.
+- **منع مدير المهام (`DisableTaskMgr`):** تعطيل **Task Manager** (`Ctrl+Shift+Esc`).
+- **منع موجه الأوامر (`DisableCMD`):** تعطيل **Command Prompt (`cmd.exe`)**.
+
+### 4. حظر التطبيقات والألعاب (App Blocker)
+- تحديد أسماء العمليات المحظورة لكل طفل (مثل `robloxplayerbeta`، `discord`، `steam`).
+- تراقب الخدمة العمليات كل 5 ثوانٍ وتغلق أي تطبيق محظور في جلسة الطفل تلقائياً مع تسجيل حدث `APP_BLOCKED` وإرسال تنبيه فوري إلى تلغرام.
+
+### 5. التحكم والمراقبة عن بُعد عبر بوت تلغرام
+- ربط سهل من صفحة **Settings & Telegram** بلصق **Bot Token** أو **رابط الـ API كاملاً** (`https://api.telegram.org/bot...`).
+- إشعارات تلقائية عند تسجيل الدخول، انتهاء الوقت، تشغيل تطبيق محظور، محاولات التلاعب بالساعة، وتقرير يومي تلقائي بعد الساعة `21:00`.
+
+#### أوامر بوت تلغرام المتاحة
+| الأمر / الزر | الوظيفة |
+|---|---|
+| `/start` أو `/menu` | عرض القائمة الرئيسية التفاعلية |
+| `/status` | حالة الجهاز، مدة التشغيل، الجلسات النشطة، والوقت المتبقي مع أزرار قفل الشاشة والخروج وتعديل الوقت |
+| `/screenshot` | التقاط لقطة شاشة حية من جلسة المستخدم النشطة وإرسالها فوراً |
+| `/limits` | عرض حدود الاستخدام اليومي وفتح قائمة زيادة/إنقاص/تعديل الوقت لكل مستخدم |
+| `/addtime <user> <±min>` | زيادة أو إنقاص الحد اليومي مباشرة (مثال: `/addtime PC 30` أو `/addtime PC -15`) |
+| `/settime <user> <min>` | تعيين الحد اليومي بالدقائق (مثال: `/settime PC 120`) |
+| `/setschedule <user> <HH:mm-HH:mm>` | تعديل الجدول المسموح (مثال: `/setschedule PC 08:00-21:30`) |
+| `/policies` | عرض قيود ويندوز والبرامج المحظورة لكل حساب |
+| `/block <user> <app>` / `/unblock <user> <app>` | حظر أو فك حظر تطبيق معين عن بُعد |
+| `/events` | عرض آخر 10 أحداث مسجلة |
+
+---
+
+## طريقة ربط بوت تلغرام خطوة بخطوة
+
+1. أنشئ بوتاً جديداً عبر [@BotFather](https://t.me/BotFather) على تلغرام واحصل على **Bot Token**.
+2. افتح برنامج **Parental Control** على الحاسوب واضغط **Settings & Telegram**.
+3. فعّل **Enable Telegram Bot integration** والصق التوكن (أو رابط الـ API كاملاً) في خانة **Telegram Bot Token or API URL**.
+4. اضغط **Test & Connect Bot**.
+5. افتح محادثة البوت في تلغرام واضغط **Start (`/start`)**، ثم اضغط **Detect Chat ID** داخل البرنامج ليتم الربط تلقائياً.
+
+---
+
+## البنية البرمجية (Architecture)
+
+```text
 +---------------------------+       +---------------------------+
-|   ParentalControl.Admin   |       | ParentalControl.Service   |
-|   (WPF Desktop App)       |       | (Windows Service)         |
-|                           |       |                           |
-|  - Dashboard View         |       |  - Session Tracker        |
-|  - User Detail View       |       |  - Usage Monitor Worker   |
-|  - Service Status Monitor |       |  - Session Change Handler |
-+------------+--------------+       +------------+--------------+
-             |                                   |
-             |         Shared Library            |
-             +--------->  ParentalControl.Core <-+
-                        |                      |
-                        |  - Data Models       |
-                        |  - Repositories      |
-                        |  - Database Manager  |
-                        |  - Session Manager   |
-                        |  - Native Methods    |
-                        +----------+-----------+
-                                   |
-                            SQLite Database
-                   (C:\ProgramData\ParentalControl\data.db)
-```
-
-Both the Admin UI and the Service share the same SQLite database. When you change a user's limits in the Admin UI, the Service picks up those changes on its next 60-second tick.
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|---|---|
-| UI Framework | WPF (Windows Presentation Foundation) |
-| UI Theme | Material Design Themes for WPF (Indigo/Amber) |
-| Architecture Pattern | MVVM (CommunityToolkit.Mvvm) |
-| Backend Service | .NET Worker Service (Windows Service) |
-| Database | SQLite (Microsoft.Data.Sqlite) |
-| Logging | Serilog (rolling file, 30-day retention) |
-| Platform Integration | Windows Terminal Services API (P/Invoke) |
-| Installer | Inno Setup 6 |
-| Target Framework | .NET 8.0 |
-| Target OS | Windows (x64 only) |
-
----
-
-## Project Structure
-
-```
-ParentalControl/
-├── src/
-│   ├── ParentalControl.Admin/           # WPF Admin UI
-│   │   ├── App.xaml(.cs)                # App startup, Material Design theme config
-│   │   ├── MainWindow.xaml(.cs)         # Main window with service status indicator
-│   │   ├── Views/
-│   │   │   ├── DashboardView.xaml(.cs)  # User list, admin list, recent events
-│   │   │   └── UserDetailView.xaml(.cs) # Per-user limits config and event history
-│   │   ├── ViewModels/
-│   │   │   ├── MainViewModel.cs         # Service polling, view navigation
-│   │   │   ├── DashboardViewModel.cs    # User discovery, event loading
-│   │   │   ├── UserDetailViewModel.cs   # Limit editing, validation, save/remove
-│   │   │   └── UserRow.cs              # Per-user presentation model
-│   │   ├── Helpers/
-│   │   │   └── DataGridScrollHelper.cs  # Shared DataGrid scroll behavior
-│   │   └── Services/
-│   │       └── UserDiscovery.cs         # Windows local user enumeration
-│   │
-│   ├── ParentalControl.Core/            # Shared library
-│   │   ├── Data/
-│   │   │   ├── DatabaseManager.cs       # SQLite initialization and schema
-│   │   │   ├── UserRepository.cs        # User CRUD
-│   │   │   ├── LimitRepository.cs       # Limit config CRUD
-│   │   │   ├── UsageRepository.cs       # Daily usage tracking
-│   │   │   └── EventRepository.cs       # Event logging and queries
-│   │   ├── Models/
-│   │   │   ├── User.cs                  # User model (Id, Sid, Username, IsRestricted)
-│   │   │   ├── LimitConfig.cs           # Limit model (DailyMinutes, ScheduleStart/End)
-│   │   │   ├── UsageRecord.cs           # Usage model (UserId, Date, MinutesUsed)
-│   │   │   ├── EventRecord.cs           # Event model (Timestamp, UserSid, EventType)
-│   │   │   └── EventType.cs             # Event type enum
-│   │   ├── Platform/
-│   │   │   ├── SessionManager.cs        # WTS API wrapper (sessions, force logoff)
-│   │   │   └── NativeMethods.cs         # P/Invoke for wtsapi32.dll
-│   │   └── Logging/
-│   │       └── LoggingConfig.cs         # Serilog configuration
-│   │
-│   └── ParentalControl.Service/         # Windows Service
-│       ├── Program.cs                   # Host setup, DI registration
-│       ├── ParentalControlServiceLifetime.cs  # Session change & power event handlers
-│       ├── SessionTracker.cs            # Active session tracking & enforcement
-│       └── UsageMonitorWorker.cs        # 60-second enforcement loop
-│
-├── installer/
-│   ├── ParentalControl.iss              # Inno Setup installer script
-│   └── Output/                          # Generated installer output
-│
-├── build.ps1                            # Build & package script
-├── icon.ico                             # Application icon
-├── ParentalControl.slnx                 # Solution file
-└── .gitignore
+|   ParentalControl.Admin   |       |  ParentalControl.Service  |
+|   (WPF Admin Dashboard)   |       |  (LocalSystem Service)    |
+|  - Dashboard & UserDetail |       |  - SessionTracker         |
+|  - Windows Restrictions   |       |  - UsageMonitorWorker     |
+|  - Blocked Apps UI        |       |  - OverlayHostWorker      |
+|  - Settings & Telegram    |       |  - TelegramBotWorker      |
++-------------+-------------+       +-------------+-------------+
+              |                                   |
+              +---------> ParentalControl.Core <--+
+                            |        |
+                   SQLite Database   Named Pipe IPC
+        (C:\ProgramData\ParentalControl)  |
+                                          v
+                           +-----------------------------+
+                           |  ParentalControl.Overlay    |
+                           |  (User Session Countdown &  |
+                           |   Desktop Screenshot Helper)|
+                           +-----------------------------+
 ```
 
 ---
 
-## Getting Started
+## البناء من المصدر (Build from Source)
 
-### Prerequisites
-
-- **Windows 10/11** (x64)
-- **.NET 8 SDK** — [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
-- **Inno Setup 6** (for building the installer) — [Download](https://jrsoftware.org/isdownload.php)
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/your-username/ParentalControl.git
-cd ParentalControl
-```
-
-### Running in Development
-
-To run the Admin UI directly during development:
-
-```bash
-dotnet run --project src/ParentalControl.Admin
-```
-
-To run the Service in console mode during development:
-
-```bash
-dotnet run --project src/ParentalControl.Service
-```
-
-> **Note:** The service needs to run with administrator privileges to track sessions and enforce logoffs. Right-click your terminal and "Run as Administrator" before starting the service.
-
-### Building the Installer
-
-The `build.ps1` script publishes both projects as self-contained win-x64 binaries and then invokes Inno Setup to create the installer:
+يتطلب **.NET 8 SDK** و**Inno Setup 6**:
 
 ```powershell
 .\build.ps1
 ```
 
-If the script fails with this error:
-
-```
-.\build.ps1 : File C:\Users\Robert\Desktop\ParentalControl\build.ps1 cannot be loaded because running scripts is
-disabled on this system. For more information, see about_Execution_Policies at
-https:/go.microsoft.com/fwlink/?LinkID=135170.
-```
-
-Run it with the execution policy bypassed:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\build.ps1
-```
-
-The build produces:
-- `publish/service/` — Self-contained service binaries
-- `publish/admin/` — Self-contained admin UI binaries
-- `installer/Output/ParentalControlSetup.exe` — The installer
-
-### Installing
-
-Run `ParentalControlSetup.exe` as administrator. The installer will:
-
-1. Install files to `C:\Program Files\ParentalControl\`
-2. Register and start the `ParentalControl.Service` Windows Service (auto-start, runs as LocalSystem)
-3. Configure automatic service restart on failure (10s, 30s, 60s intervals)
-4. Create Start Menu and Desktop shortcuts for the Admin UI
-
-### Uninstalling
-
-Navigate to `C:\Program Files\ParentalControl\` and run `uninst000.exe`. This will launch the uninstaller, which will:
-
-- Stop and remove the `ParentalControl.Service` Windows Service
-- Remove all program files from `C:\Program Files\ParentalControl\`
-- Remove the database and logs from `C:\ProgramData\ParentalControl\`
-- Remove Start Menu and Desktop shortcuts
+ينتج المثبّت الكامل في: `installer\Output\ParentalControlSetup.exe`.
 
 ---
 
-## How It Works
+## English Overview
 
-### Service Lifecycle
-
-1. **Startup** — The service initializes the SQLite database, recovers any existing active sessions, and begins the 60-second monitoring loop.
-2. **Session Change** — When a user logs on, the service checks their restrictions. If the user is outside their schedule or has exhausted their daily limit, login is denied (forced logoff). Otherwise, the session is tracked.
-3. **Monitoring Loop** — Every 60 seconds, the service iterates over all active sessions. For each restricted user, it increments their daily usage and checks limits. Violations trigger a forced logoff.
-4. **Logoff** — When a user logs off (or is forced off), accumulated session time is flushed to the database.
-5. **Sleep/Wake** — On system sleep, all session times are flushed and tracking pauses. On wake, tracking resumes without counting sleep time.
-
-### Data Flow
-
-The Admin UI and the Service both read/write the same SQLite database at `C:\ProgramData\ParentalControl\data.db`. There is no API or IPC between them — the database is the shared state. SQLite's WAL (Write-Ahead Logging) mode ensures safe concurrent access.
-
-### Database Schema
-
-| Table | Purpose |
-|---|---|
-| `users` | Local Windows users (SID, username, restricted flag) |
-| `limits` | Per-user limit config (daily minutes, schedule start/end) |
-| `usage` | Daily usage records (user, date, minutes used) |
-| `events` | Audit log of all enforcement events |
-
----
-
-## File Locations (After Installation)
-
-| Path | Contents |
-|---|---|
-| `C:\Program Files\ParentalControl\admin\` | Admin UI binaries |
-| `C:\Program Files\ParentalControl\service\` | Service binaries |
-| `C:\ProgramData\ParentalControl\data.db` | SQLite database |
-| `C:\ProgramData\ParentalControl\logs\` | Rolling log files (30-day retention) |
-
----
+**Windows Parental Control** is an open-source Windows utility (built on [robertpin/WindowsParentalControl](https://github.com/robertpin/WindowsParentalControl)) with per-user daily limits & schedules, Windows policy restrictions (`LockTaskbar`, `NoControlPanel`, `DisableTaskMgr`, `DisableCMD`), per-user process blocking, a floating child countdown overlay (`+15m` extra time requests), live desktop screenshots, and full remote management via Telegram Bot.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT License — see [LICENSE](LICENSE).

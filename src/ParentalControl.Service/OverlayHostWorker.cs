@@ -302,6 +302,10 @@ public sealed class OverlayHostWorker : BackgroundService
         var scheduleEndDt = now.Date.Add(limit.ScheduleEnd.ToTimeSpan());
         var scheduleSeconds = Math.Max(0, (int)(scheduleEndDt - now).TotalSeconds);
 
+        var appsCount = BlockedAppRepository.GetByUserId(user.Id).Count;
+        var policy = UserPolicyRepository.GetByUserId(user.Id);
+        var sessionMinutes = Math.Max(1, usedMinutes);
+
         return new OverlayStatus
         {
             ShouldShow = true,
@@ -311,7 +315,13 @@ public sealed class OverlayHostWorker : BackgroundService
             MinutesUsed = usedMinutes,
             ScheduleStart = limit.ScheduleStart.ToString("HH:mm"),
             ScheduleEnd = limit.ScheduleEnd.ToString("HH:mm"),
-            EffectiveSecondsRemaining = Math.Min(dailySeconds, scheduleSeconds)
+            EffectiveSecondsRemaining = Math.Min(dailySeconds, scheduleSeconds),
+            SessionMinutes = sessionMinutes,
+            BlockTaskManager = policy?.BlockTaskManager ?? false,
+            BlockRegistry = policy?.BlockSettings ?? false,
+            BlockControlPanel = policy?.BlockSettings ?? false,
+            BlockCmd = policy?.BlockCommandPrompt ?? false,
+            BlockedAppsCount = appsCount
         };
     }
 

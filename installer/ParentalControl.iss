@@ -2,10 +2,11 @@
 ; Requires Inno Setup 6.2+ (https://jrsoftware.org/isdownload.php)
 
 #define MyAppName      "Parental Control"
-#define MyAppVersion   "1.2.2"
+#define MyAppVersion   "1.2.3"
 #define MyAppPublisher "ParentalControl"
 #define MyAppExeName   "ParentalControl.Admin.exe"
 #define ServiceExeName "ParentalControl.Service.exe"
+#define OverlayExeName "ParentalControl.Overlay.exe"
 #define ServiceName    "ParentalControl.Service"
 
 [Setup]
@@ -19,12 +20,15 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 OutputDir=Output
 OutputBaseFilename=ParentalControlSetup
-Compression=lzma2
+Compression=lzma2/ultra64
 SolidCompression=yes
+LZMAUseSeparateProcess=yes
+LZMANumBlockThreads=4
+LZMADictionarySize=65536
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\admin\{#MyAppExeName}
+UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=..\icon.ico
 CloseApplications=force
 
@@ -32,20 +36,16 @@ CloseApplications=force
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; Service files
-Source: "..\publish\service\*"; DestDir: "{app}\service"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; Admin app files
-Source: "..\publish\admin\*"; DestDir: "{app}\admin"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; Child countdown overlay & screenshot helper
-Source: "..\publish\overlay\*"; DestDir: "{app}\overlay"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Unified shared runtime and application files
+Source: "..\publish\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\admin\{#MyAppExeName}"; \
-    IconFilename: "{app}\admin\{#MyAppExeName}"; Comment: "Launch Parental Control Admin"
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\admin\{#MyAppExeName}"; \
-    IconFilename: "{app}\admin\{#MyAppExeName}"; Comment: "Launch Parental Control Admin"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; \
+    IconFilename: "{app}\{#MyAppExeName}"; Comment: "Launch Parental Control Admin"
+Name: "{group}\Child Time & Safety Dashboard"; Filename: "{app}\{#OverlayExeName}"; \
+    Parameters: "--dashboard"; IconFilename: "{app}\{#OverlayExeName}"; Comment: "Child Screen Time & Protection Dashboard"
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; \
+    IconFilename: "{app}\{#MyAppExeName}"; Comment: "Launch Parental Control Admin"
 
 [UninstallRun]
 ; Stop and delete the service before files are removed
@@ -102,7 +102,7 @@ var
     ResultCode: Integer;
     BinPath: String;
 begin
-    BinPath := ExpandConstant('"{app}\service\{#ServiceExeName}"');
+    BinPath := ExpandConstant('"{app}\{#ServiceExeName}"');
 
     if not ServiceExists() then
     begin

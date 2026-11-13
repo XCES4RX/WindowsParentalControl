@@ -33,6 +33,14 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (e.Args.Length >= 1 && e.Args[0].Equals("--dashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            var dash = new ChildDashboardWindow();
+            MainWindow = dash;
+            dash.Show();
+            return;
+        }
+
         _instanceMutex = new Mutex(true, @"Local\ParentalControl_Overlay_Mutex", out var createdNew);
         if (!createdNew)
         {

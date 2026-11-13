@@ -1,7 +1,7 @@
 namespace ParentalControl.Core.Models;
 
 /// <summary>
-/// Live session countdown status sent from the service to the interactive overlay process.
+/// Live session countdown and protection status sent from the service to the child companion/overlay.
 /// </summary>
 public sealed class OverlayStatus
 {
@@ -13,4 +13,10 @@ public sealed class OverlayStatus
     public string ScheduleStart { get; set; } = string.Empty;
     public string ScheduleEnd { get; set; } = string.Empty;
     public int EffectiveSecondsRemaining { get; set; }
+    public int SessionMinutes { get; set; }
+    public bool BlockTaskManager { get; set; }
+    public bool BlockRegistry { get; set; }
+    public bool BlockControlPanel { get; set; }
+    public bool BlockCmd { get; set; }
+    public int BlockedAppsCount { get; set; }
 }

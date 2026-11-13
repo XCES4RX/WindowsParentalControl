@@ -16,7 +16,7 @@ public partial class CountdownWindow : Window
 {
     private const string PipeName = "ParentalControl_OverlayStatus";
 
-    private static readonly MediaBrush BrushNormal = new SolidColorBrush(MediaColor.FromRgb(0x4A, 0xDE, 0x80));
+    private static readonly MediaBrush BrushNormal = new SolidColorBrush(MediaColor.FromRgb(0x38, 0xBD, 0xF8));
     private static readonly MediaBrush BrushWarning = new SolidColorBrush(MediaColor.FromRgb(0xFB, 0xBF, 0x24));
     private static readonly MediaBrush BrushCritical = new SolidColorBrush(MediaColor.FromRgb(0xF8, 0x71, 0x71));
 
@@ -27,7 +27,8 @@ public partial class CountdownWindow : Window
     private int _remainingSeconds = -1;
     private bool _allowClose;
     private bool _isSyncing;
-    private DateTime _lastRequestSentAt = DateTime.MinValue;
+    private System.Windows.Point _mouseDownPos;
+    private ChildDashboardWindow? _dashboardWindow;
 
     public CountdownWindow()
     {
@@ -56,45 +57,37 @@ public partial class CountdownWindow : Window
 
     private void CardBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        _mouseDownPos = e.GetPosition(this);
         if (e.ButtonState == MouseButtonState.Pressed)
         {
-            DragMove();
+            try
+            {
+                DragMove();
+            }
+            catch
+            {
+                // Ignore drag exceptions
+            }
+        }
+
+        var upPos = e.GetPosition(this);
+        // If it was mostly a click rather than a major drag, open Child Dashboard
+        if (Math.Abs(upPos.X - _mouseDownPos.X) < 5 && Math.Abs(upPos.Y - _mouseDownPos.Y) < 5)
+        {
+            OpenChildDashboard();
         }
     }
 
-    private async void RequestTimeButton_Click(object sender, RoutedEventArgs e)
+    public void OpenChildDashboard()
     {
-        if ((DateTime.Now - _lastRequestSentAt).TotalSeconds < 60)
+        if (_dashboardWindow is null || !_dashboardWindow.IsLoaded)
         {
-            RequestTimeButton.Content = "Wait";
-            return;
+            _dashboardWindow = new ChildDashboardWindow();
         }
 
-        RequestTimeButton.IsEnabled = false;
-        RequestTimeButton.Content = "...";
-        try
-        {
-            using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-            await pipe.ConnectAsync(2000);
-
-            using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
-            using var reader = new StreamReader(pipe, leaveOpen: true);
-
-            await writer.WriteLineAsync($"REQUEST_TIME:{_sessionId}:15");
-            var response = await reader.ReadLineAsync();
-            _lastRequestSentAt = DateTime.Now;
-            RequestTimeButton.Content = response == "OK" ? "Sent!" : "Wait";
-        }
-        catch
-        {
-            RequestTimeButton.Content = "Err";
-        }
-        finally
-        {
-            await Task.Delay(3000);
-            RequestTimeButton.Content = "+15m";
-            RequestTimeButton.IsEnabled = true;
-        }
+        _dashboardWindow.Show();
+        _dashboardWindow.WindowState = WindowState.Normal;
+        _dashboardWindow.Activate();
     }
 
     private void OnLocalTick()
@@ -155,12 +148,13 @@ public partial class CountdownWindow : Window
                 _allowClose = true;
                 _tickTimer.Stop();
                 _syncTimer.Stop();
+                _dashboardWindow?.Close();
                 Close();
                 return;
             }
 
             _remainingSeconds = Math.Max(0, status.EffectiveSecondsRemaining);
-            UsernameText.Text = status.Username;
+            UsernameText.Text = string.IsNullOrWhiteSpace(status.Username) ? "PC" : status.Username;
             SubInfoText.Text = $"Until {status.ScheduleEnd} • {status.MinutesUsed}/{status.DailyMinutes}m";
             UpdateCountdownDisplay();
         }

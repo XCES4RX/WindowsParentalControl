@@ -3,12 +3,8 @@
 .SYNOPSIS
     Publishes the ParentalControl projects and builds the Inno Setup installer.
 .DESCRIPTION
-    1. Publishes ParentalControl.Service and ParentalControl.Admin as self-contained win-x64.
-    2. Invokes the Inno Setup compiler to produce ParentalControlSetup.exe.
-.PARAMETER InnoSetupPath
-    Path to iscc.exe. Defaults to the standard Inno Setup 6 install location.
-.PARAMETER Configuration
-    Build configuration. Defaults to Release.
+    1. Publishes ParentalControl.Admin, Overlay, and Service as self-contained win-x64 with shared runtime deduplication and stripped debug symbols.
+    2. Invokes the Inno Setup compiler with ultra-high LZMA2 solid compression.
 #>
 param(
     [string]$InnoSetupPath = "",
@@ -21,6 +17,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot   = $PSScriptRoot
 $srcDir     = Join-Path $repoRoot "src"
 $publishDir = Join-Path $repoRoot "publish"
+$appPublish = Join-Path $publishDir "app"
 $issFile    = Join-Path $repoRoot "installer\ParentalControl.iss"
 
 # Detect Inno Setup compiler
@@ -49,42 +46,40 @@ if (Test-Path $publishDir) {
     Remove-Item $publishDir -Recurse -Force
 }
 
-# Publish Service
-Write-Host "`n=== Publishing ParentalControl.Service ===" -ForegroundColor Cyan
-dotnet publish "$srcDir\ParentalControl.Service\ParentalControl.Service.csproj" `
-    --configuration $Configuration `
-    --runtime win-x64 `
-    --self-contained true `
-    --output "$publishDir\service"
+New-Item -ItemType Directory -Path $appPublish -Force | Out-Null
 
-if ($LASTEXITCODE -ne 0) { Write-Error "Service publish failed."; exit 1 }
+$publishArgs = @(
+    "-c", $Configuration,
+    "-r", "win-x64",
+    "--self-contained", "true",
+    "-p:DebugType=None",
+    "-p:DebugSymbols=false",
+    "-p:SatelliteResourceLanguages=en-US",
+    "-o", $appPublish
+)
 
 # Publish Admin
 Write-Host "`n=== Publishing ParentalControl.Admin ===" -ForegroundColor Cyan
-dotnet publish "$srcDir\ParentalControl.Admin\ParentalControl.Admin.csproj" `
-    --configuration $Configuration `
-    --runtime win-x64 `
-    --self-contained true `
-    --output "$publishDir\admin"
-
+dotnet publish "$srcDir\ParentalControl.Admin\ParentalControl.Admin.csproj" @publishArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "Admin publish failed."; exit 1 }
 
 # Publish Overlay
 Write-Host "`n=== Publishing ParentalControl.Overlay ===" -ForegroundColor Cyan
-dotnet publish "$srcDir\ParentalControl.Overlay\ParentalControl.Overlay.csproj" `
-    --configuration $Configuration `
-    --runtime win-x64 `
-    --self-contained true `
-    --output "$publishDir\overlay"
-
+dotnet publish "$srcDir\ParentalControl.Overlay\ParentalControl.Overlay.csproj" @publishArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "Overlay publish failed."; exit 1 }
 
-# Build Installer
-Write-Host "`n=== Building Installer ===" -ForegroundColor Cyan
-& $InnoSetupPath $issFile
+# Publish Service
+Write-Host "`n=== Publishing ParentalControl.Service ===" -ForegroundColor Cyan
+dotnet publish "$srcDir\ParentalControl.Service\ParentalControl.Service.csproj" @publishArgs
+if ($LASTEXITCODE -ne 0) { Write-Error "Service publish failed."; exit 1 }
 
+# Build Installer
+Write-Host "`n=== Building Installer with Ultra LZMA2 Compression ===" -ForegroundColor Cyan
+& $InnoSetupPath $issFile
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed."; exit 1 }
 
 $outputExe = Join-Path $repoRoot "installer\Output\ParentalControlSetup.exe"
+$sizeMb = [math]::Round((Get-Item $outputExe).Length / 1MB, 2)
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green
 Write-Host "Installer: $outputExe"
+Write-Host "Installer Size: $sizeMb MB"

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/app-icon.png" alt="Windows Parental Control Logo" width="110" height="110" />
+  <img src="docs/images/hero-banner.png" alt="Windows Parental Control" width="100%" />
 </p>
 
 <h1 align="center">Windows Parental Control</h1>
@@ -22,16 +22,10 @@
 
 <p align="center">
   <a href="https://github.com/XCES4RX/WindowsParentalControl/releases/latest"><b>Download ParentalControlSetup.exe</b></a> •
+  <a href="#overview"><b>Overview</b></a> •
   <a href="#key-features"><b>Features</b></a> •
-  <a href="#telegram-remote-control"><b>Telegram Bot</b></a> •
-  <a href="#architecture"><b>Architecture</b></a> •
+  <a href="#telegram-bot-commands"><b>Telegram Bot</b></a> •
   <a href="#installation--setup"><b>Setup Guide</b></a>
-</p>
-
----
-
-<p align="center">
-  <img src="docs/images/hero-banner.png" alt="Hero Banner" width="100%" />
 </p>
 
 ---
@@ -45,7 +39,7 @@ Parents can monitor and configure their children's devices in real time from any
 ---
 
 <p align="center">
-  <img src="docs/images/feature-matrix.png" alt="Feature Matrix" width="100%" />
+  <img src="docs/images/system-architecture.png" alt="Core Architecture & System Capabilities" width="100%" />
 </p>
 
 ---
@@ -85,12 +79,6 @@ Parents can monitor and configure their children's devices in real time from any
 ### 6. Ultra-Compact & Shared Architecture
 - **Deduplicated Runtime:** The Admin UI, Child Companion, and Background Service share a unified .NET 8 runtime footprint, reducing the uncompressed disk footprint from over 410 MB to just ~159 MB.
 - **Solid LZMA2 Compression:** Packaged with Inno Setup using 64-bit dictionary solid compression, yielding a setup installer size of **~49 MB** while remaining 100% self-contained (no external .NET installation required).
-
----
-
-<p align="center">
-  <img src="docs/images/system-architecture.png" alt="System Architecture" width="100%" />
-</p>
 
 ---
 

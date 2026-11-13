@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.ServiceProcess;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -41,6 +42,17 @@ public partial class MainViewModel : ObservableObject
         _dashboardVm.LoadAll();
 
         UpdateServiceStatus();
+
+        // If service is not running on launch, automatically try to start it
+        if (!_isServiceRunning)
+        {
+            _ = Task.Run(() =>
+            {
+                TryStartService();
+                System.Windows.Application.Current?.Dispatcher.Invoke(UpdateServiceStatus);
+            });
+        }
+
         _serviceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _serviceTimer.Tick += (_, _) => UpdateServiceStatus();
         _serviceTimer.Start();
@@ -55,30 +67,77 @@ public partial class MainViewModel : ObservableObject
 
     public void StopServicePolling() => _serviceTimer.Stop();
 
+    [RelayCommand]
+    private void StartService()
+    {
+        TryStartService();
+        UpdateServiceStatus();
+    }
+
+    private static void TryStartService()
+    {
+        try
+        {
+            using var sc = new ServiceController(ServiceName);
+            if (sc.Status != ServiceControllerStatus.Running && sc.Status != ServiceControllerStatus.StartPending)
+            {
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(5));
+            }
+        }
+        catch
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "sc.exe",
+                    Arguments = $"start {ServiceName}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit(5000);
+            }
+            catch
+            {
+                // Ignore fallback failure
+            }
+        }
+    }
+
     private void UpdateServiceStatus()
     {
         var lang = LocalizedStrings.Instance.CurrentLanguage;
+        var isRunning = false;
+
         try
         {
             using var sc = new ServiceController(ServiceName);
             sc.Refresh();
-            if (sc.Status == ServiceControllerStatus.Running)
-            {
-                ServiceStatusText = LocalizationManager.T("service_active", lang);
-                ServiceStatusColor = new SolidColorBrush(Color.FromRgb(16, 185, 129)); // Modern Emerald Green
-                IsServiceRunning = true;
-            }
-            else
-            {
-                ServiceStatusText = LocalizationManager.T("service_down", lang);
-                ServiceStatusColor = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // Modern Crimson
-                IsServiceRunning = false;
-            }
+            isRunning = sc.Status == ServiceControllerStatus.Running;
         }
-        catch (InvalidOperationException)
+        catch
+        {
+            // SCM access might be restricted; fall back to process check
+            isRunning = Process.GetProcessesByName("ParentalControl.Service").Length > 0;
+        }
+
+        if (!isRunning && Process.GetProcessesByName("ParentalControl.Service").Length > 0)
+        {
+            isRunning = true;
+        }
+
+        if (isRunning)
+        {
+            ServiceStatusText = LocalizationManager.T("service_active", lang);
+            ServiceStatusColor = new SolidColorBrush(Color.FromRgb(16, 185, 129)); // Modern Emerald Green
+            IsServiceRunning = true;
+        }
+        else
         {
             ServiceStatusText = LocalizationManager.T("service_down", lang);
-            ServiceStatusColor = new SolidColorBrush(Color.FromRgb(239, 68, 68));
+            ServiceStatusColor = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // Modern Crimson
             IsServiceRunning = false;
         }
 

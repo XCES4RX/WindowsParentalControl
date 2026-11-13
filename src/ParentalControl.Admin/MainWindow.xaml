@@ -56,14 +56,18 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Service Status Pill -->
-                    <Border Style="{StaticResource StatusPill}" Margin="0,0,12,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="{Binding ServiceStatusColor}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                            <TextBlock Text="{Binding ServiceStatusText}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{Binding ServiceStatusColor}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
+                    <!-- Service Status Pill (Clickable to start if stopped) -->
+                    <Button Command="{Binding StartServiceCommand}"
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Height="32" Padding="0" Margin="0,0,12,0">
+                        <Border Style="{StaticResource StatusPill}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{Binding ServiceStatusColor}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding ServiceStatusText}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{Binding ServiceStatusColor}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </Button>
 
                     <!-- Settings Button -->
                     <Button Command="{Binding OpenSettingsCommand}"

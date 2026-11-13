@@ -72,45 +72,60 @@ begin
               and (ResultCode = 0);
 end;
 
-procedure StopAndDeleteService();
+procedure PrepareForInstall();
 var
     ResultCode: Integer;
+    i: Integer;
 begin
-    Exec('sc', ExpandConstant('stop {#ServiceName}'),
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Sleep(2000);
-    Exec('taskkill', '/F /IM ParentalControl.Overlay.exe',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill', '/F /IM ParentalControl.Admin.exe',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('sc', ExpandConstant('delete {#ServiceName}'),
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Terminate UI apps
+    Exec('taskkill', '/F /IM ParentalControl.Overlay.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill', '/F /IM ParentalControl.Admin.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // Stop service safely without deleting it
+    if ServiceExists() then
+    begin
+        Exec('sc', ExpandConstant('stop {#ServiceName}'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        for i := 1 to 5 do
+        begin
+            Sleep(1000);
+            if not ServiceExists() then Break;
+        end;
+    end;
+
+    // Terminate any stuck service process to unlock files for replacement
+    Exec('taskkill', '/F /IM ParentalControl.Service.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(1000);
 end;
 
-procedure CreateService();
+procedure SetupService();
 var
     ResultCode: Integer;
     BinPath: String;
 begin
     BinPath := ExpandConstant('"{app}\service\{#ServiceExeName}"');
 
-    Exec('sc', ExpandConstant('create {#ServiceName}')
-         + ' binPath= ' + BinPath
-         + ' start= auto'
-         + ' obj= LocalSystem'
-         + ' DisplayName= "Parental Control Service"',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if not ServiceExists() then
+    begin
+        Exec('sc', ExpandConstant('create {#ServiceName}')
+             + ' binPath= ' + BinPath
+             + ' start= auto'
+             + ' obj= LocalSystem'
+             + ' DisplayName= "Parental Control Service"',
+             '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-    // Set description
-    Exec('sc', ExpandConstant('description {#ServiceName}')
-         + ' "Monitors and enforces parental control time limits."',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc', ExpandConstant('description {#ServiceName}')
+             + ' "Monitors and enforces parental control time limits."',
+             '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-    // Configure service to restart on failure (10s, 30s, 60s)
-    Exec('sc', ExpandConstant('failure {#ServiceName}')
-         + ' reset= 86400 actions= restart/10000/restart/30000/restart/60000',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc', ExpandConstant('failure {#ServiceName}')
+             + ' reset= 86400 actions= restart/10000/restart/30000/restart/60000',
+             '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end
+    else
+    begin
+        Exec('sc', ExpandConstant('config {#ServiceName} binPath= ') + BinPath + ' start= auto',
+             '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
 end;
 
 procedure StartService();
@@ -120,48 +135,37 @@ var
     Started: Boolean;
 begin
     Started := False;
-    Sleep(2000);  // Let SCM finish registering the service
+    Sleep(1500);
 
-    for Retries := 1 to 3 do
+    for Retries := 1 to 4 do
     begin
-        Log(Format('StartService: attempt %d of 3', [Retries]));
+        Log(Format('StartService: attempt %d of 4', [Retries]));
         if Exec('sc', ExpandConstant('start {#ServiceName}'),
                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
         begin
-            if (ResultCode = 0) or (ResultCode = 1056) then  // 1056 = already running
+            if (ResultCode = 0) or (ResultCode = 1056) then
             begin
                 Log('StartService: service started successfully');
                 Started := True;
                 Break;
             end;
             Log(Format('StartService: sc start returned %d', [ResultCode]));
-        end
-        else
-            Log('StartService: Exec call itself failed');
+        end;
 
-        if Retries < 3 then
-            Sleep(1000 + Retries * 1000);  // Escalating: 2s, 3s
+        if Retries < 4 then
+            Sleep(1000 + Retries * 1000);
     end;
-
-    if not Started then
-        MsgBox('The Parental Control service could not be started automatically. '
-               + 'It will start after the next reboot, or you can start it manually '
-               + 'from the Services console (services.msc).',
-               mbInformation, MB_OK);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
     if CurStep = ssInstall then
     begin
-        // Before files are copied: stop existing service so files are not locked
-        if ServiceExists() then
-            StopAndDeleteService();
+        PrepareForInstall();
     end
     else if CurStep = ssPostInstall then
     begin
-        // After files are copied: create and start the service
-        CreateService();
+        SetupService();
         StartService();
     end;
 end;

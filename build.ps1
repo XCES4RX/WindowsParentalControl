@@ -78,8 +78,13 @@ Write-Host "`n=== Building Installer with Ultra LZMA2 Compression ===" -Foregrou
 & $InnoSetupPath $issFile
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed."; exit 1 }
 
-$outputExe = Join-Path $repoRoot "installer\Output\ParentalControlSetup.exe"
-$sizeMb = [math]::Round((Get-Item $outputExe).Length / 1MB, 2)
+$versionedExe = Join-Path $repoRoot "installer\Output\ParentalControlSetup-v1.3.0.exe"
+$genericExe   = Join-Path $repoRoot "installer\Output\ParentalControlSetup.exe"
+if (Test-Path $versionedExe) {
+    Copy-Item $versionedExe $genericExe -Force
+}
+$sizeMb = [math]::Round((Get-Item $versionedExe).Length / 1MB, 2)
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green
-Write-Host "Installer: $outputExe"
+Write-Host "Installer (Versioned): $versionedExe"
+Write-Host "Installer (Generic):   $genericExe"
 Write-Host "Installer Size: $sizeMb MB"

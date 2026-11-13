@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/XCES4RX/WindowsParentalControl/releases/latest"><b>Download ParentalControlSetup.exe</b></a> •
+  <a href="https://github.com/XCES4RX/WindowsParentalControl/releases/latest"><b>Download ParentalControlSetup-v1.3.0.exe</b></a> •
   <a href="#overview"><b>Overview</b></a> •
   <a href="#key-features"><b>Features</b></a> •
   <a href="#telegram-bot-commands"><b>Telegram Bot</b></a> •
@@ -87,6 +87,11 @@ Parents can monitor and configure their children's devices in real time from any
 | Command | Action |
 |:---|:---|
 | `/menu` or `/start` | Displays interactive buttons and primary control panel |
+| `/top` or `/activity` | **Top Apps & Sites:** Shows most used applications and websites visited today |
+| `/msg <user> <text>` | **Screen Message:** Pops up an instant message dialog on the child's screen with chime |
+| `/pause <user> [min]` | **Dinner / Focus Mode:** Locks workstation for specified minutes without deducting daily limit |
+| `/resume <user>` | **Resume Session:** Unlocks workstation and lifts pause mode |
+| `/dns [on/off]` | **Family Safe DNS:** Enforces Cloudflare 1.1.1.3 adult & malware filter system-wide |
 | `/status` | Real-time workstation uptime, service status, active sessions, and remaining time |
 | `/screenshot` | Captures and delivers a live desktop screenshot of the current user session |
 | `/limits` | Inspects daily usage limits and launches interactive adjustment buttons |

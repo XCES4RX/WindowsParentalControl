@@ -19,4 +19,7 @@ public sealed class OverlayStatus
     public bool BlockControlPanel { get; set; }
     public bool BlockCmd { get; set; }
     public int BlockedAppsCount { get; set; }
+    public string? BroadcastMessage { get; set; }
+    public bool IsPaused { get; set; }
+    public string? PauseUntil { get; set; }
 }

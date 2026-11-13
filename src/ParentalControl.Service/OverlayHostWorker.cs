@@ -24,6 +24,51 @@ public sealed class OverlayHostWorker : BackgroundService
     private readonly Serilog.ILogger _logger;
     private readonly ConcurrentDictionary<int, DateTime> _lastTimeRequests = new();
     private readonly ConcurrentDictionary<string, DateTime> _lastAppBlockAlerts = new();
+    private readonly ConcurrentDictionary<int, string> _pendingMessages = new();
+    private readonly ConcurrentDictionary<int, DateTime> _pausedSessions = new();
+
+    public bool SendMessageToUser(string username, string message)
+    {
+        var target = _sessionTracker.ActiveSessions.Values
+            .FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (target is null) return false;
+        _pendingMessages[target.SessionId] = message;
+        return true;
+    }
+
+    public bool PauseUser(string username, int minutes)
+    {
+        var target = _sessionTracker.ActiveSessions.Values
+            .FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (target is null) return false;
+        _pausedSessions[target.SessionId] = DateTime.Now.AddMinutes(minutes);
+        SessionManager.DisconnectSession(target.SessionId);
+        return true;
+    }
+
+    public bool ResumeUser(string username)
+    {
+        var target = _sessionTracker.ActiveSessions.Values
+            .FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (target is null) return false;
+        _pausedSessions.TryRemove(target.SessionId, out _);
+        return true;
+    }
+
+    public bool IsUserPaused(int sessionId, out DateTime pauseUntil)
+    {
+        if (_pausedSessions.TryGetValue(sessionId, out var until))
+        {
+            if (DateTime.Now < until)
+            {
+                pauseUntil = until;
+                return true;
+            }
+            _pausedSessions.TryRemove(sessionId, out _);
+        }
+        pauseUntil = DateTime.MinValue;
+        return false;
+    }
 
     public OverlayHostWorker(SessionTracker sessionTracker, TelegramNotifier notifier, Serilog.ILogger logger)
     {
@@ -73,7 +118,8 @@ public sealed class OverlayHostWorker : BackgroundService
                     continue;
                 }
 
-                var sessionId = ParseSessionId(request);
+                var (sessionId, activeApp, activeSite) = ParseStatusRequest(request);
+                RecordClientActivity(sessionId, activeApp, activeSite);
                 var status = BuildOverlayStatus(sessionId);
                 var json = JsonSerializer.Serialize(status);
 
@@ -99,6 +145,7 @@ public sealed class OverlayHostWorker : BackgroundService
             {
                 EnsureOverlaysRunning();
                 EnforceBlockedApps();
+                EnforcePausedSessions();
             }
             catch (Exception ex)
             {
@@ -305,6 +352,8 @@ public sealed class OverlayHostWorker : BackgroundService
         var appsCount = BlockedAppRepository.GetByUserId(user.Id).Count;
         var policy = UserPolicyRepository.GetByUserId(user.Id);
         var sessionMinutes = Math.Max(1, usedMinutes);
+        var isPaused = IsUserPaused(sessionId, out var pauseUntil);
+        _pendingMessages.TryRemove(sessionId, out var pendingMsg);
 
         return new OverlayStatus
         {
@@ -321,8 +370,54 @@ public sealed class OverlayHostWorker : BackgroundService
             BlockRegistry = policy?.BlockSettings ?? false,
             BlockControlPanel = policy?.BlockSettings ?? false,
             BlockCmd = policy?.BlockCommandPrompt ?? false,
-            BlockedAppsCount = appsCount
+            BlockedAppsCount = appsCount,
+            BroadcastMessage = pendingMsg,
+            IsPaused = isPaused,
+            PauseUntil = isPaused ? pauseUntil.ToString("HH:mm") : null
         };
+    }
+
+    private void EnforcePausedSessions()
+    {
+        foreach (var (sessionId, session) in _sessionTracker.ActiveSessions)
+        {
+            if (IsUserPaused(sessionId, out _))
+            {
+                SessionManager.DisconnectSession(sessionId);
+            }
+        }
+    }
+
+    private static (int SessionId, string ActiveApp, string ActiveSite) ParseStatusRequest(string? request)
+    {
+        if (string.IsNullOrWhiteSpace(request) || !request.StartsWith("STATUS:", StringComparison.OrdinalIgnoreCase))
+            return (0, string.Empty, string.Empty);
+
+        var parts = request.Split(':');
+        if (parts.Length < 2 || !int.TryParse(parts[1], out var sid))
+            return (0, string.Empty, string.Empty);
+
+        var app = parts.Length > 2 ? Uri.UnescapeDataString(parts[2]) : string.Empty;
+        var site = parts.Length > 3 ? Uri.UnescapeDataString(parts[3]) : string.Empty;
+        return (sid, app, site);
+    }
+
+    private void RecordClientActivity(int sessionId, string activeApp, string activeSite)
+    {
+        if (sessionId <= 0) return;
+        if (!_sessionTracker.ActiveSessions.TryGetValue(sessionId, out var session)) return;
+        var user = UserRepository.GetBySid(session.UserSid);
+        if (user is null) return;
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        if (!string.IsNullOrWhiteSpace(activeApp))
+        {
+            ActivityRepository.RecordActivity(user.Id, today, "APP", activeApp, activeApp, 5);
+        }
+        if (!string.IsNullOrWhiteSpace(activeSite))
+        {
+            ActivityRepository.RecordActivity(user.Id, today, "SITE", activeSite, activeSite, 5);
+        }
     }
 
     private static int ParseSessionId(string? request)

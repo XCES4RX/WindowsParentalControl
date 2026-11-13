@@ -27,6 +27,9 @@ public partial class CountdownWindow : Window
     private int _remainingSeconds = -1;
     private bool _allowClose;
     private bool _isSyncing;
+    private bool _chimed5Min;
+    private bool _chimed1Min;
+    private bool _isPaused;
     private System.Windows.Point _mouseDownPos;
     private ChildDashboardWindow? _dashboardWindow;
 
@@ -95,6 +98,22 @@ public partial class CountdownWindow : Window
         if (_remainingSeconds > 0)
         {
             _remainingSeconds--;
+
+            if (_remainingSeconds == 300 && !_chimed5Min)
+            {
+                _chimed5Min = true;
+                try { System.Media.SystemSounds.Exclamation.Play(); } catch { }
+            }
+            else if (_remainingSeconds == 60 && !_chimed1Min)
+            {
+                _chimed1Min = true;
+                try { System.Media.SystemSounds.Hand.Play(); } catch { }
+            }
+            else if (_remainingSeconds > 300)
+            {
+                _chimed5Min = false;
+                _chimed1Min = false;
+            }
         }
 
         UpdateCountdownDisplay();
@@ -102,6 +121,14 @@ public partial class CountdownWindow : Window
 
     private void UpdateCountdownDisplay()
     {
+        if (_isPaused)
+        {
+            CountdownText.Text = "PAUSED";
+            CountdownText.Foreground = BrushWarning;
+            StatusDot.Fill = BrushWarning;
+            return;
+        }
+
         if (_remainingSeconds < 0)
         {
             CountdownText.Text = "--:--:--";
@@ -136,7 +163,11 @@ public partial class CountdownWindow : Window
             using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
             using var reader = new StreamReader(pipe, leaveOpen: true);
 
-            await writer.WriteLineAsync($"STATUS:{_sessionId}");
+            var (activeApp, activeSite) = ActiveWindowTracker.GetActiveAppAndSite();
+            var encApp = Uri.EscapeDataString(activeApp ?? string.Empty);
+            var encSite = Uri.EscapeDataString(activeSite ?? string.Empty);
+
+            await writer.WriteLineAsync($"STATUS:{_sessionId}:{encApp}:{encSite}");
             var json = await reader.ReadLineAsync();
             if (string.IsNullOrWhiteSpace(json)) return;
 
@@ -153,10 +184,28 @@ public partial class CountdownWindow : Window
                 return;
             }
 
+            _isPaused = status.IsPaused;
             _remainingSeconds = Math.Max(0, status.EffectiveSecondsRemaining);
             UsernameText.Text = string.IsNullOrWhiteSpace(status.Username) ? "PC" : status.Username;
-            SubInfoText.Text = $"Until {status.ScheduleEnd} • {status.MinutesUsed}/{status.DailyMinutes}m";
+
+            if (status.IsPaused)
+            {
+                SubInfoText.Text = string.IsNullOrWhiteSpace(status.PauseUntil)
+                    ? "Break / Dinner active"
+                    : $"Break until {status.PauseUntil}";
+            }
+            else
+            {
+                SubInfoText.Text = $"Until {status.ScheduleEnd} • {status.MinutesUsed}/{status.DailyMinutes}m";
+            }
+
             UpdateCountdownDisplay();
+
+            if (!string.IsNullOrWhiteSpace(status.BroadcastMessage))
+            {
+                var msgWin = new NotificationMessageWindow(status.BroadcastMessage);
+                msgWin.Show();
+            }
         }
         catch
         {

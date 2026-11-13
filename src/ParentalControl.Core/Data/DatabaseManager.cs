@@ -100,6 +100,20 @@ public static class DatabaseManager
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                activity_type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                duration_seconds INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(user_id, date, activity_type, name),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_activity_user_date ON activity_log (user_id, date);
             """;
         schemaCmd.ExecuteNonQuery();
     }

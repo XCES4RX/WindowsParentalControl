@@ -5,6 +5,7 @@ using ParentalControl.Core.Data;
 using ParentalControl.Core.Localization;
 using ParentalControl.Core.Models;
 using ParentalControl.Core.Platform;
+using ParentalControl.Core.Security;
 using ParentalControl.Core.Telegram;
 
 namespace ParentalControl.Service;
@@ -24,6 +25,19 @@ public sealed class TelegramBotWorker : BackgroundService
     private readonly Dictionary<string, (string Mode, int UserId)> _pendingInputs = new();
     private long _updateOffset;
     private bool _isFirstPoll = true;
+    private DateOnly _lastDailyDigestDate = DateOnly.MinValue;
+
+    private async Task CheckSendDailyDigestAsync(string token, string chatId, string lang, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(chatId)) return;
+        var now = DateTime.Now;
+        var today = DateOnly.FromDateTime(now);
+        if (now.Hour >= 21 && _lastDailyDigestDate != today)
+        {
+            _lastDailyDigestDate = today;
+            await SendTopActivityAsync(token, chatId, lang, ct);
+        }
+    }
 
     public TelegramBotWorker(
         TelegramApiClient client,
@@ -95,6 +109,8 @@ public sealed class TelegramBotWorker : BackgroundService
                             stoppingToken);
                     }
                 }
+
+                await CheckSendDailyDigestAsync(settings.TelegramBotToken, settings.TelegramChatId, settings.TelegramLanguage, stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -189,6 +205,21 @@ public sealed class TelegramBotWorker : BackgroundService
             return await HandleTextBlockAppCommandAsync(token, chatId, cmd, parts, lang, ct);
         }
 
+        if (cmd == "/msg")
+        {
+            return await HandleMsgCommandAsync(token, chatId, rawText, lang, ct);
+        }
+
+        if (cmd is "/pause" or "/resume")
+        {
+            return await HandlePauseResumeCommandAsync(token, chatId, cmd, parts, lang, ct);
+        }
+
+        if (cmd == "/dns")
+        {
+            return await HandleDnsCommandAsync(token, chatId, parts, lang, ct);
+        }
+
         return await DispatchCommandAsync(token, chatId, cmd, lang, ct);
     }
 
@@ -238,6 +269,22 @@ public sealed class TelegramBotWorker : BackgroundService
             case "/update":
             case "cmd:update":
                 await HandleUpdateCommandAsync(token, chatId, lang, ct);
+                return null;
+
+            case "/top":
+            case "/activity":
+            case "cmd:top":
+                await SendTopActivityAsync(token, chatId, lang, ct);
+                return null;
+
+            case "/pause":
+            case "cmd:pause":
+                await HandleQuickDinnerPauseAsync(token, chatId, lang, ct);
+                return null;
+
+            case "/dns":
+            case "cmd:dns":
+                await HandleDnsCommandAsync(token, chatId, Array.Empty<string>(), lang, ct);
                 return null;
 
             default:
@@ -950,18 +997,225 @@ public sealed class TelegramBotWorker : BackgroundService
                 new { text = LocalizationManager.T("btn_screenshot", lang), callback_data = "cmd:screenshot" }
             ],
             [
+                new { text = LocalizationManager.T("btn_top_activity", lang), callback_data = "cmd:top" },
+                new { text = LocalizationManager.T("btn_dinner_pause", lang), callback_data = "cmd:pause" }
+            ],
+            [
                 new { text = LocalizationManager.T("btn_time_limits", lang), callback_data = "cmd:limits" },
                 new { text = LocalizationManager.T("btn_win_restrictions", lang), callback_data = "cmd:policies" }
             ],
             [
-                new { text = LocalizationManager.T("btn_events", lang), callback_data = "cmd:events" },
-                new { text = LocalizationManager.T("btn_language", lang), callback_data = "cmd:language" }
+                new { text = LocalizationManager.T("btn_family_dns", lang), callback_data = "cmd:dns" },
+                new { text = LocalizationManager.T("btn_events", lang), callback_data = "cmd:events" }
             ],
             [
+                new { text = LocalizationManager.T("btn_language", lang), callback_data = "cmd:language" },
                 new { text = LocalizationManager.T("btn_check_update", lang), callback_data = "cmd:update" }
             ]
         }
     };
+
+    private async Task SendTopActivityAsync(string token, string chatId, string lang, CancellationToken ct)
+    {
+        var users = UserRepository.GetAll().Where(u => u.IsRestricted).ToList();
+        if (users.Count == 0)
+        {
+            users = UserRepository.GetAll().ToList();
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var sb = new StringBuilder();
+
+        sb.AppendLine(lang == "en" ? $"📊 <b>Today's Activity & Screen Time ({today:yyyy-MM-dd})</b>" :
+                      lang == "fr" ? $"📊 <b>Activité et temps d'écran aujourd'hui ({today:yyyy-MM-dd})</b>" :
+                      $"📊 <b>نشاط واستخدام التطبيقات والمواقع اليوم ({today:yyyy-MM-dd})</b>");
+        sb.AppendLine();
+
+        foreach (var user in users)
+        {
+            var topApps = ActivityRepository.GetTopApps(user.Id, today, 5);
+            var topSites = ActivityRepository.GetTopSites(user.Id, today, 5);
+
+            sb.AppendLine($"👤 <b>{Escape(user.Username)}:</b>");
+
+            sb.AppendLine(lang == "en" ? "  🎮 <b>Most Used Apps:</b>" :
+                          lang == "fr" ? "  🎮 <b>Applications les plus utilisées:</b>" :
+                          "  🎮 <b>أكثر البرامج استخداماً:</b>");
+
+            if (topApps.Count == 0)
+            {
+                sb.AppendLine(lang == "en" ? "    <i>No application activity recorded yet.</i>" :
+                              lang == "fr" ? "    <i>Aucune activité d'application enregistrée.</i>" :
+                              "    <i>لم يُسجل أي نشاط للتطبيقات بعد.</i>");
+            }
+            else
+            {
+                for (var i = 0; i < topApps.Count; i++)
+                {
+                    var a = topApps[i];
+                    sb.AppendLine($"    {i + 1}. <code>{Escape(a.Name)}</code> — {FormatDuration(a.DurationSeconds)}");
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine(lang == "en" ? "  🌐 <b>Most Visited Sites & Topics:</b>" :
+                          lang == "fr" ? "  🌐 <b>Sites & pages les plus consultés:</b>" :
+                          "  🌐 <b>أكثر المواقع والأنشطة تصفحاً:</b>");
+
+            if (topSites.Count == 0)
+            {
+                sb.AppendLine(lang == "en" ? "    <i>No web browsing activity recorded yet.</i>" :
+                              lang == "fr" ? "    <i>Aucun site web enregistré.</i>" :
+                              "    <i>لم يُسجل أي تصفح للمواقع بعد.</i>");
+            }
+            else
+            {
+                for (var i = 0; i < topSites.Count; i++)
+                {
+                    var s = topSites[i];
+                    sb.AppendLine($"    {i + 1}. <b>{Escape(s.Name)}</b> — {FormatDuration(s.DurationSeconds)}");
+                }
+            }
+
+            sb.AppendLine();
+        }
+
+        await _client.SendMessageAsync(token, chatId, sb.ToString(), BuildMainKeyboard(lang), ct);
+    }
+
+    private async Task<string?> HandleMsgCommandAsync(string token, string chatId, string rawText, string lang, CancellationToken ct)
+    {
+        var parts = rawText.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3)
+        {
+            var hint = lang == "en" ? "ℹ️ Syntax: <code>/msg <user> <message></code>\nExample: <code>/msg PC Time for dinner!</code>" :
+                       lang == "fr" ? "ℹ️ Syntaxe: <code>/msg <utilisateur> <message></code>\nExemple: <code>/msg PC L'heure du dîner !</code>" :
+                       "ℹ️ الصيغة: <code>/msg <المستخدم> <نص الرسالة></code>\nمثال: <code>/msg PC حان وقت الصلاة يا بطل</code>";
+            await _client.SendMessageAsync(token, chatId, hint, BuildMainKeyboard(lang), ct);
+            return null;
+        }
+
+        var username = parts[1];
+        var text = parts[2];
+
+        var ok = _overlayHost.SendMessageToUser(username, text);
+        if (ok)
+        {
+            var reply = lang == "en" ? $"✅ Message sent to <b>{Escape(username)}</b>'s screen!" :
+                        lang == "fr" ? $"✅ Message envoyé sur l'écran de <b>{Escape(username)}</b> !" :
+                        $"✅ تم إرسال الرسالة إلى شاشة <b>{Escape(username)}</b> بنجاح!";
+            await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+            return $"Sent message to {username}";
+        }
+        else
+        {
+            var reply = lang == "en" ? $"⚠️ User <b>{Escape(username)}</b> is not currently logged in or active." :
+                        lang == "fr" ? $"⚠️ L'utilisateur <b>{Escape(username)}</b> n'est pas connecté actuellement." :
+                        $"⚠️ المستخدم <b>{Escape(username)}</b> غير متصل حالياً.";
+            await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+            return null;
+        }
+    }
+
+    private async Task<string?> HandlePauseResumeCommandAsync(string token, string chatId, string cmd, string[] parts, string lang, CancellationToken ct)
+    {
+        if (parts.Length < 2)
+        {
+            var hint = lang == "en" ? "ℹ️ Syntax: <code>/pause <user> [minutes]</code> or <code>/resume <user></code>\nExample: <code>/pause PC 30</code>" :
+                       lang == "fr" ? "ℹ️ Syntaxe: <code>/pause <utilisateur> [minutes]</code> ou <code>/resume <utilisateur></code>" :
+                       "ℹ️ الصيغة: <code>/pause <المستخدم> [دقائق]</code> أو <code>/resume <المستخدم></code>\nمثال: <code>/pause PC 30</code>";
+            await _client.SendMessageAsync(token, chatId, hint, BuildMainKeyboard(lang), ct);
+            return null;
+        }
+
+        var username = parts[1];
+        if (cmd == "/pause")
+        {
+            var minutes = 30;
+            if (parts.Length >= 3 && int.TryParse(parts[2], out var m) && m > 0)
+            {
+                minutes = m;
+            }
+
+            var ok = _overlayHost.PauseUser(username, minutes);
+            if (ok)
+            {
+                var reply = lang == "en" ? $"⏸️ Workstation paused for <b>{Escape(username)}</b> for {minutes} min (Dinner / Break Mode)." :
+                            lang == "fr" ? $"⏸️ Session mise en pause pour <b>{Escape(username)}</b> pendant {minutes} min (Mode dîner / pause)." :
+                            $"⏸️ تم تفعيل وضع الاستراحة / العشاء لـ <b>{Escape(username)}</b> لمدة {minutes} دقيقة وتم قفل الشاشة.";
+                await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+                return $"Paused {username} for {minutes}m";
+            }
+            else
+            {
+                var reply = lang == "en" ? $"⚠️ User <b>{Escape(username)}</b> is not currently active." :
+                            lang == "fr" ? $"⚠️ L'utilisateur <b>{Escape(username)}</b> n'est pas actif." :
+                            $"⚠️ المستخدم <b>{Escape(username)}</b> غير نشط حالياً.";
+                await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+                return null;
+            }
+        }
+        else
+        {
+            var ok = _overlayHost.ResumeUser(username);
+            var reply = lang == "en" ? $"▶️ Pause mode lifted for <b>{Escape(username)}</b>. Screen unlocked." :
+                        lang == "fr" ? $"▶️ Pause levée pour <b>{Escape(username)}</b>. Écran déverrouillé." :
+                        $"▶️ تم إلغاء وضع الاستراحة للمستخدم <b>{Escape(username)}</b> وإعادة فتح الجهاز.";
+            await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+            return $"Resumed {username}";
+        }
+    }
+
+    private async Task HandleQuickDinnerPauseAsync(string token, string chatId, string lang, CancellationToken ct)
+    {
+        var targetSession = _sessionTracker.ActiveSessions.Values.FirstOrDefault();
+        if (targetSession is null)
+        {
+            var reply = lang == "en" ? "ℹ️ No active user sessions to pause." :
+                        lang == "fr" ? "ℹ️ Aucune session active à mettre en pause." :
+                        "ℹ️ لا توجد جلسات مستخدمين نشطة حالياً لتفعيل الاستراحة.";
+            await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+            return;
+        }
+
+        _overlayHost.PauseUser(targetSession.Username, 30);
+        var msg = lang == "en" ? $"⏸️ Workstation paused for <b>{Escape(targetSession.Username)}</b> for 30 minutes (Dinner / Break Mode)." :
+                  lang == "fr" ? $"⏸️ Session mise en pause pour <b>{Escape(targetSession.Username)}</b> pendant 30 min (Mode dîner / pause)." :
+                  $"⏸️ تم تفعيل وضع الاستراحة / العشاء لـ <b>{Escape(targetSession.Username)}</b> لمدة 30 دقيقة وتم قفل الشاشة.";
+        await _client.SendMessageAsync(token, chatId, msg, BuildMainKeyboard(lang), ct);
+    }
+
+    private async Task<string?> HandleDnsCommandAsync(string token, string chatId, string[] parts, string lang, CancellationToken ct)
+    {
+        var enable = true;
+        if (parts.Length >= 2)
+        {
+            enable = parts[1].Equals("on", StringComparison.OrdinalIgnoreCase) ||
+                     parts[1].Equals("enable", StringComparison.OrdinalIgnoreCase) ||
+                     parts[1].Equals("1", StringComparison.OrdinalIgnoreCase);
+        }
+        else
+        {
+            enable = !DnsProtectionManager.IsEnabled();
+        }
+
+        DnsProtectionManager.SetFamilyDns(enable);
+        var stateStr = enable ? "ON ✅" : "OFF ⚪";
+        var reply = lang == "en" ? $"🛡️ Family Safe DNS (Adult & Malware Blocker): <b>{stateStr}</b>" :
+                    lang == "fr" ? $"🛡️ Filtrage DNS Familial (Sites adultes & malware) : <b>{stateStr}</b>" :
+                    $"🛡️ حجب المواقع الضارة والإباحية عبر DNS العائلي: <b>{stateStr}</b>";
+        await _client.SendMessageAsync(token, chatId, reply, BuildMainKeyboard(lang), ct);
+        return $"Toggled DNS to {enable}";
+    }
+
+    private static string FormatDuration(int seconds)
+    {
+        var mins = seconds / 60;
+        if (mins < 1) return "< 1m";
+        var h = mins / 60;
+        var m = mins % 60;
+        return h > 0 ? $"{h}h {m}m" : $"{m}m";
+    }
 
     private static string FormatMinutes(int totalMinutes) =>
         totalMinutes >= 60 ? $"{totalMinutes / 60}h {totalMinutes % 60}m" : $"{totalMinutes}m";

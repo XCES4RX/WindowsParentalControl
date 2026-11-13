@@ -142,6 +142,10 @@ public static class LocalizationManager
         // ═══ Bot Menus & Buttons ═══
         ["btn_status"] = "📊 حالة الجهاز",
         ["btn_screenshot"] = "📸 لقطة شاشة",
+        ["btn_top_activity"] = "📊 الأكثر استخداماً",
+        ["btn_dinner_pause"] = "⏸️ إيقاف عشاء (30د)",
+        ["btn_send_msg"] = "💬 رسالة للشاشة",
+        ["btn_family_dns"] = "🛡️ حجب المواقع (DNS)",
         ["btn_time_limits"] = "⏱ الوقت والحدود",
         ["btn_win_restrictions"] = "⚙️ قيود ويندوز",
         ["btn_events"] = "📋 آخر الأحداث",
@@ -304,6 +308,10 @@ public static class LocalizationManager
         // ═══ Bot Menus & Buttons ═══
         ["btn_status"] = "📊 Device Status",
         ["btn_screenshot"] = "📸 Screenshot",
+        ["btn_top_activity"] = "📊 Top Apps & Sites",
+        ["btn_dinner_pause"] = "⏸️ Dinner Pause (30m)",
+        ["btn_send_msg"] = "💬 Screen Message",
+        ["btn_family_dns"] = "🛡️ Family Safe DNS",
         ["btn_time_limits"] = "⏱ Time & Limits",
         ["btn_win_restrictions"] = "⚙️ Windows Policies",
         ["btn_events"] = "📋 Recent Events",
@@ -466,6 +474,10 @@ public static class LocalizationManager
         // ═══ Bot Menus & Buttons ═══
         ["btn_status"] = "📊 État de l'appareil",
         ["btn_screenshot"] = "📸 Capture d'écran",
+        ["btn_top_activity"] = "📊 Applications & Sites",
+        ["btn_dinner_pause"] = "⏸️ Pause Dîner (30m)",
+        ["btn_send_msg"] = "💬 Message à l'écran",
+        ["btn_family_dns"] = "🛡️ DNS Familial",
         ["btn_time_limits"] = "⏱ Temps & Limites",
         ["btn_win_restrictions"] = "⚙️ Restrictions Windows",
         ["btn_events"] = "📋 Derniers événements",

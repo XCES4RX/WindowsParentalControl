@@ -189,4 +189,27 @@ public static partial class SettingsRepository
 
     [GeneratedRegex(@"api\.telegram\.org/bot([^/\s?]+)", RegexOptions.IgnoreCase)]
     private static partial Regex BotUrlRegex();
+
+    public static string? GetCustomSetting(string key)
+    {
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT value FROM app_settings WHERE key = @key";
+        cmd.Parameters.AddWithValue("@key", key);
+        var result = cmd.ExecuteScalar();
+        return result?.ToString();
+    }
+
+    public static void SetCustomSetting(string key, string value)
+    {
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO app_settings (key, value) VALUES (@key, @value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """;
+        cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@value", value);
+        cmd.ExecuteNonQuery();
+    }
 }

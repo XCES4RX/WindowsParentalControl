@@ -1,6 +1,6 @@
 # نظام الرقابة الأبوية لويندوز — Windows Parental Control
 
-> **مبني ومطوّر على مشروع [robertpin/WindowsParentalControl](https://github.com/robertpin/WindowsParentalControl) (برخصة MIT)** مع إضافات متقدمة تشمل التحكم الكامل عبر بوت تلغرام، أخذ لقطات شاشة مباشرة، قيود ويندوز لكل طفل، حظر التطبيقات والألعاب، ومربع عدّ تنازلي عائم على شاشة الطفل.
+نظام متكامل واحترافي للرقابة الأبوية وإدارة وقت استخدام الكمبيوتر للأطفال على نظام ويندوز، يدعم التحكم الكامل والمراقبة الحية عن بُعد عبر بوت تلغرام، التحديث التلقائي الصامت، ودعم اللغات العربية والإنجليزية والفرنسية.
 
 ---
 
@@ -29,40 +29,61 @@
 
 ## المميزات الرئيسية
 
-### 1. إدارة الوقت والجدول الزمني
+### 1. التحكم والإدارة عن بُعد عبر بوت تلغرام
+- **لوحة تحكم ذكية:** عرض حالة الكمبيوتر، مدة التشغيل، الجلسات النشطة، والوقت المتبقي.
+- **العمل في وضع عدم الاتصال (Offline Queue):** يمكنك إرسال الأوامر وتعديل الأوقات عبر البوت حتى لو كان الكمبيوتر مغلقاً (أوفلاين)؛ وفور تشغيل الجهاز وإقلاع الويندوز يقوم البوت بتطبيق كافة التعديلات المعلقة فوراً وتأكيدها.
+- **تعدد اللغات (Multilingual):** دعم كامل للغات **العربية 🇸🇦**، **الإنجليزية 🇬🇧**، و**الفرنسية 🇫🇷**. يمكن تغيير لغة البوت فوراً عبر الأمر `/language` أو الضغط على زر `🌐 اللغة / Language`.
+- **أخذ لقطة شاشة مباشرة (`/screenshot`):** التقاط شاشة سطح المكتب في جلسة المستخدم الحالية وإرسالها لصورة حية للوالدين.
+- **قفل الشاشة وتسجيل الخروج عن بُعد:** إمكانية قفل جلسة الطفل أو تسجيل خروجه بضغطة زر.
+- **إشعارات فورية ذكية:** تنبيهات فورية عند:
+  - 🟢 تسجيل دخول المستخدم.
+  - 🚪 تسجيل خروج المستخدم.
+  - 🔴 إيقاف تشغيل الجهاز أو إعادة تشغيله.
+  - 🌙 دخول الجهاز في وضع السكون واستئناف العمل.
+  - ⌛ انتهاء الوقت المسموح أو نهاية الجدول الزمني.
+  - ⚠️ محاولات التلاعب بساعة الويندوز.
+  - 🚫 محاولات تشغيل البرامج أو الألعاب المحظورة.
+  - 🙋 طلب وقت إضافي من الطفل مع أزرار للموافقة أو الرفض.
+
+### 2. التحديث التلقائي الصامت (Silent Auto-Updates)
+- تتحقق الخدمة في الخلفية بشكل دوري من صفحة الإصدارات في GitHub.
+- بمجرد رفع إصدار جديد، يتم تنزيله تلقائياً وتثبيته بصمت تام (`/VERYSILENT`) في الخلفية دون مقاطعة المستخدم أو إظهار نوافذ منبثقة، وتصل رسالة تأكيد للوالدين عبر تلغرام بنجاح التحديث.
+
+### 3. إدارة الوقت والجدول الزمني
 - **حد يومي للاستخدام:** تحديد عدد الدقائق المسموحة يومياً لكل حساب قياسي (تُحسب دقيقة بدقيقة وتُصفَّر تلقائياً عند منتصف الليل).
 - **نوافذ زمنية (Schedule):** تحديد ساعات العمل المسموحة (مثلاً `07:00 - 23:00`) ومنع تسجيل الدخول خارجها.
 - **تنبيه قبل انتهاء الوقت:** إظهار نافذة تحذيرية على شاشة الطفل قبل **5 دقائق** وقبل **دقيقة واحدة** من انتهاء الجلسة لحفظ أعماله.
 - **كشف التلاعب بالساعة:** إذا تم إرجاع ساعة النظام للخلف، يغلق النظام الجلسة فوراً لبقية اليوم ويسجل حدث `CLOCK_TAMPER`.
 
-### 2. مربع العدّ التنازلي العائم للطفل (`ParentalControl.Overlay`)
-- مربع صغير أنيق وشفاف يطفو في زاوية الشاشة (قابل للسحب) ويعرض الوقت المتبقي الفعلي لنهاية الجلسة (الأقل بين المتبقي اليومي ونهاية الجدول).
+### 4. مربع العدّ التنازلي العائم للطفل (`ParentalControl.Overlay`)
+- مربع صغير أنيق وشفاف يطفو في زاوية الشاشة (قابل للسحب) ويعرض الوقت المتبقي الفعلي لنهاية الجلسة.
 - يتغير لونه تلقائياً حسب الوقت المتبقي (أخضر ← برتقالي عند ≤ 15 دقيقة ← أحمر عند ≤ 5 دقائق).
 - يحتوي على زر **`+15m`** ليرسل الطفل طلباً فورياً للوالدين عبر تلغرام للموافقة أو الرفض بضغطة زر.
 
-### 3. قيود ويندوز لكل طفل (Windows Restrictions)
-يمكن تفعيل كل قيد بشكل مستقل لكل حساب طفل من لوحة الإدارة وتُطبَّق تلقائياً عبر `HKEY_USERS\{SID}`:
+### 5. قيود ويندوز لكل طفل (Windows Restrictions)
+يمكن تفعيل كل قيد بشكل مستقل لكل حساب طفل من لوحة الإدارة:
 - **قفل شريط المهام (`LockTaskbar`):** قفل شريط المهام ومنع إعداداته وقائمة الزر الأيمن.
 - **منع الإعدادات ولوحة التحكم (`NoControlPanel`):** حظر **Windows Settings** و**Control Panel**.
 - **منع مدير المهام (`DisableTaskMgr`):** تعطيل **Task Manager** (`Ctrl+Shift+Esc`).
 - **منع موجه الأوامر (`DisableCMD`):** تعطيل **Command Prompt (`cmd.exe`)**.
 
-### 4. حظر التطبيقات والألعاب (App Blocker)
+### 6. حظر التطبيقات والألعاب (App Blocker)
 - تحديد أسماء العمليات المحظورة لكل طفل (مثل `robloxplayerbeta`، `discord`، `steam`).
-- تراقب الخدمة العمليات كل 5 ثوانٍ وتغلق أي تطبيق محظور في جلسة الطفل تلقائياً مع تسجيل حدث `APP_BLOCKED` وإرسال تنبيه فوري إلى تلغرام.
+- مراقبة العمليات كل 5 ثوانٍ وإغلاق أي تطبيق محظور في جلسة الطفل فوراً مع إشعار الوالدين.
 
-### 5. التحكم والمراقبة عن بُعد عبر بوت تلغرام
-- ربط سهل من صفحة **Settings & Telegram** بلصق **Bot Token** أو **رابط الـ API كاملاً** (`https://api.telegram.org/bot...`).
-- إشعارات تلقائية عند تسجيل الدخول، انتهاء الوقت، تشغيل تطبيق محظور، محاولات التلاعب بالساعة، وتقرير يومي تلقائي بعد الساعة `21:00`.
+---
 
-#### أوامر بوت تلغرام المتاحة
+## أوامر بوت تلغرام المتاحة
+
 | الأمر / الزر | الوظيفة |
 |---|---|
 | `/start` أو `/menu` | عرض القائمة الرئيسية التفاعلية |
-| `/status` | حالة الجهاز، مدة التشغيل، الجلسات النشطة، والوقت المتبقي مع أزرار قفل الشاشة والخروج وتعديل الوقت |
+| `/status` | حالة الجهاز، مدة التشغيل، الجلسات النشطة، والوقت المتبقي |
 | `/screenshot` | التقاط لقطة شاشة حية من جلسة المستخدم النشطة وإرسالها فوراً |
-| `/limits` | عرض حدود الاستخدام اليومي وفتح قائمة زيادة/إنقاص/تعديل الوقت لكل مستخدم |
-| `/addtime <user> <±min>` | زيادة أو إنقاص الحد اليومي مباشرة (مثال: `/addtime PC 30` أو `/addtime PC -15`) |
+| `/limits` | عرض حدود الاستخدام اليومي وفتح قائمة زيادة/إنقاص/تعديل الوقت |
+| `/language` | اختيار لغة البوت (العربية 🇸🇦 / English 🇬🇧 / Français 🇫🇷) |
+| `/update` | التحقق من وجود تحديث جديد على غيت هب وتثبيته فوراً |
+| `/addtime <user> <±min>` | زيادة أو إنقاص الوقت مباشرة (مثال: `/addtime PC 30` أو `/addtime PC -15`) |
 | `/settime <user> <min>` | تعيين الحد اليومي بالدقائق (مثال: `/settime PC 120`) |
 | `/setschedule <user> <HH:mm-HH:mm>` | تعديل الجدول المسموح (مثال: `/setschedule PC 08:00-21:30`) |
 | `/policies` | عرض قيود ويندوز والبرامج المحظورة لكل حساب |
@@ -91,6 +112,7 @@
 |  - Windows Restrictions   |       |  - UsageMonitorWorker     |
 |  - Blocked Apps UI        |       |  - OverlayHostWorker      |
 |  - Settings & Telegram    |       |  - TelegramBotWorker      |
+|  - Multilingual & Updates |       |  - AutoUpdateWorker       |
 +-------------+-------------+       +-------------+-------------+
               |                                   |
               +---------> ParentalControl.Core <--+
@@ -115,14 +137,17 @@
 .\build.ps1
 ```
 
-ينتج المثبّت الكامل في: `installer\Output\ParentalControlSetup.exe`.
+ينتج مثبت البرنامج الكامل في: `installer\Output\ParentalControlSetup.exe`.
 
 ---
 
 ## English Overview
 
-**Windows Parental Control** is an open-source Windows utility (built on [robertpin/WindowsParentalControl](https://github.com/robertpin/WindowsParentalControl)) with per-user daily limits & schedules, Windows policy restrictions (`LockTaskbar`, `NoControlPanel`, `DisableTaskMgr`, `DisableCMD`), per-user process blocking, a floating child countdown overlay (`+15m` extra time requests), live desktop screenshots, and full remote management via Telegram Bot.
+**Windows Parental Control** is an open-source Windows utility for managing children's screen time and computer activity. It features per-user daily limits & schedules, Windows policy restrictions (`LockTaskbar`, `NoControlPanel`, `DisableTaskMgr`, `DisableCMD`), per-user process blocking, a floating child countdown overlay (`+15m` extra time requests), live desktop screenshots, silent auto-updates from GitHub releases, offline command queue execution, and remote management via Telegram Bot with full multilingual support (Arabic, English, French).
 
-## License
+---
 
-MIT License — see [LICENSE](LICENSE).
+## License & Credits
+
+- MIT License — see [LICENSE](LICENSE).
+- Based on WindowsParentalControl (MIT License).

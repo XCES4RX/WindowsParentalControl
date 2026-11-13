@@ -11,7 +11,7 @@
     Build configuration. Defaults to Release.
 #>
 param(
-    [string]$InnoSetupPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    [string]$InnoSetupPath = "",
     [string]$Configuration = "Release"
 )
 
@@ -23,9 +23,23 @@ $srcDir     = Join-Path $repoRoot "src"
 $publishDir = Join-Path $repoRoot "publish"
 $issFile    = Join-Path $repoRoot "installer\ParentalControl.iss"
 
-# Verify Inno Setup is installed
-if (-not (Test-Path $InnoSetupPath)) {
-    Write-Error "Inno Setup compiler not found at '$InnoSetupPath'. Install from https://jrsoftware.org/isdownload.php or pass -InnoSetupPath."
+# Detect Inno Setup compiler
+if (-not $InnoSetupPath -or -not (Test-Path $InnoSetupPath)) {
+    $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+        "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+        "C:\Program Files\Inno Setup 6\ISCC.exe"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) {
+            $InnoSetupPath = $c
+            break
+        }
+    }
+}
+
+if (-not $InnoSetupPath -or -not (Test-Path $InnoSetupPath)) {
+    Write-Error "Inno Setup compiler not found. Install from https://jrsoftware.org/isdownload.php or pass -InnoSetupPath."
     exit 1
 }
 

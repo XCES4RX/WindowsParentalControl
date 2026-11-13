@@ -4,7 +4,7 @@ using ParentalControl.Core.Models;
 namespace ParentalControl.Core.Data;
 
 /// <summary>
-/// Persistence for global application and Telegram settings in the <c>app_settings</c> table.
+/// Persistence for global application, Telegram, and auto-update settings in the <c>app_settings</c> table.
 /// </summary>
 public static partial class SettingsRepository
 {
@@ -12,8 +12,14 @@ public static partial class SettingsRepository
     private const string KeyTelegramBotToken = "telegram_bot_token";
     private const string KeyTelegramChatId = "telegram_chat_id";
     private const string KeyNotifyOnLogin = "notify_on_login";
+    private const string KeyNotifyOnLogout = "notify_on_logout";
+    private const string KeyNotifyOnShutdown = "notify_on_shutdown";
     private const string KeyNotifyOnLimitReached = "notify_on_limit_reached";
     private const string KeyShowCountdownOverlay = "show_countdown_overlay";
+    private const string KeyAppLanguage = "app_language";
+    private const string KeyTelegramLanguage = "telegram_language";
+    private const string KeyAutoUpdateEnabled = "auto_update_enabled";
+    private const string KeyTelegramUpdateOffset = "telegram_update_offset";
 
     public static AppSettings Get()
     {
@@ -34,8 +40,14 @@ public static partial class SettingsRepository
             TelegramBotToken = map.GetValueOrDefault(KeyTelegramBotToken, string.Empty),
             TelegramChatId = map.GetValueOrDefault(KeyTelegramChatId, string.Empty),
             NotifyOnLogin = ParseBool(map, KeyNotifyOnLogin, true),
+            NotifyOnLogout = ParseBool(map, KeyNotifyOnLogout, true),
+            NotifyOnShutdown = ParseBool(map, KeyNotifyOnShutdown, true),
             NotifyOnLimitReached = ParseBool(map, KeyNotifyOnLimitReached, true),
             ShowCountdownOverlay = ParseBool(map, KeyShowCountdownOverlay, true),
+            AppLanguage = NormalizeLanguage(map.GetValueOrDefault(KeyAppLanguage, "ar")),
+            TelegramLanguage = NormalizeLanguage(map.GetValueOrDefault(KeyTelegramLanguage, "ar")),
+            AutoUpdateEnabled = ParseBool(map, KeyAutoUpdateEnabled, true),
+            TelegramUpdateOffset = ParseLong(map, KeyTelegramUpdateOffset, 0)
         };
     }
 
@@ -52,8 +64,14 @@ public static partial class SettingsRepository
             (KeyTelegramBotToken, normalizedToken),
             (KeyTelegramChatId, settings.TelegramChatId.Trim()),
             (KeyNotifyOnLogin, settings.NotifyOnLogin ? "1" : "0"),
+            (KeyNotifyOnLogout, settings.NotifyOnLogout ? "1" : "0"),
+            (KeyNotifyOnShutdown, settings.NotifyOnShutdown ? "1" : "0"),
             (KeyNotifyOnLimitReached, settings.NotifyOnLimitReached ? "1" : "0"),
             (KeyShowCountdownOverlay, settings.ShowCountdownOverlay ? "1" : "0"),
+            (KeyAppLanguage, NormalizeLanguage(settings.AppLanguage)),
+            (KeyTelegramLanguage, NormalizeLanguage(settings.TelegramLanguage)),
+            (KeyAutoUpdateEnabled, settings.AutoUpdateEnabled ? "1" : "0"),
+            (KeyTelegramUpdateOffset, settings.TelegramUpdateOffset.ToString())
         };
 
         using var cmd = connection.CreateCommand();
@@ -74,6 +92,64 @@ public static partial class SettingsRepository
         }
 
         transaction.Commit();
+    }
+
+    public static long GetTelegramUpdateOffset()
+    {
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT value FROM app_settings WHERE key = @key";
+        cmd.Parameters.AddWithValue("@key", KeyTelegramUpdateOffset);
+        var result = cmd.ExecuteScalar() as string;
+        return long.TryParse(result, out var val) ? val : 0;
+    }
+
+    public static void SaveTelegramUpdateOffset(long offset)
+    {
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO app_settings (key, value)
+            VALUES (@key, @value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """;
+        cmd.Parameters.AddWithValue("@key", KeyTelegramUpdateOffset);
+        cmd.Parameters.AddWithValue("@value", offset.ToString());
+        cmd.ExecuteNonQuery();
+    }
+
+    public static string GetTelegramLanguage()
+    {
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT value FROM app_settings WHERE key = @key";
+        cmd.Parameters.AddWithValue("@key", KeyTelegramLanguage);
+        var result = cmd.ExecuteScalar() as string;
+        return NormalizeLanguage(result);
+    }
+
+    public static void SaveTelegramLanguage(string language)
+    {
+        var norm = NormalizeLanguage(language);
+        using var connection = DatabaseManager.CreateConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO app_settings (key, value)
+            VALUES (@key, @value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """;
+        cmd.Parameters.AddWithValue("@key", KeyTelegramLanguage);
+        cmd.Parameters.AddWithValue("@value", norm);
+        cmd.ExecuteNonQuery();
+    }
+
+    public static string NormalizeLanguage(string? lang)
+    {
+        if (string.IsNullOrWhiteSpace(lang)) return "ar";
+        var lower = lang.Trim().ToLowerInvariant();
+        if (lower.StartsWith("en")) return "en";
+        if (lower.StartsWith("fr")) return "fr";
+        return "ar";
     }
 
     /// <summary>
@@ -103,6 +179,12 @@ public static partial class SettingsRepository
     {
         if (!map.TryGetValue(key, out var raw)) return defaultValue;
         return raw == "1" || raw.Equals("true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static long ParseLong(Dictionary<string, string> map, string key, long defaultValue)
+    {
+        if (!map.TryGetValue(key, out var raw)) return defaultValue;
+        return long.TryParse(raw, out var val) ? val : defaultValue;
     }
 
     [GeneratedRegex(@"api\.telegram\.org/bot([^/\s?]+)", RegexOptions.IgnoreCase)]

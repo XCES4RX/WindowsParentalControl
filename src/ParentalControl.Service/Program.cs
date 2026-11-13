@@ -17,6 +17,8 @@ builder.Services.AddSingleton<SessionTracker>();
 builder.Services.AddSingleton<OverlayHostWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<OverlayHostWorker>());
 builder.Services.AddHostedService<UsageMonitorWorker>();
+builder.Services.AddSingleton<AutoUpdateWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AutoUpdateWorker>());
 builder.Services.AddHostedService<TelegramBotWorker>();
 builder.Services.AddSingleton<IHostLifetime>(sp =>
 {
@@ -26,10 +28,11 @@ builder.Services.AddSingleton<IHostLifetime>(sp =>
     var hostOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HostOptions>>();
     var serviceOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WindowsServiceLifetimeOptions>>();
     var sessionTracker = sp.GetRequiredService<SessionTracker>();
+    var notifier = sp.GetRequiredService<TelegramNotifier>();
     var serilogLogger = sp.GetRequiredService<Serilog.ILogger>();
 
     return new ParentalControlServiceLifetime(
-        env, appLifetime, loggerFactory, hostOptions, serviceOptions, sessionTracker, serilogLogger);
+        env, appLifetime, loggerFactory, hostOptions, serviceOptions, sessionTracker, notifier, serilogLogger);
 });
 
 var host = builder.Build();

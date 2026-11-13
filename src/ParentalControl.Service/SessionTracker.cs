@@ -114,6 +114,7 @@ public sealed class SessionTracker
         {
             FlushSessionTime(session);
             EventRepository.LogEvent(session.UserSid, EventType.LOGOUT);
+            _notifier.NotifyLogout(session.Username);
             _logger.Information("User logged off: {Username}", session.Username);
         }
     }
@@ -122,6 +123,7 @@ public sealed class SessionTracker
     {
         _isAwake = false;
         _logger.Information("System entering sleep");
+        _notifier.NotifySleep();
 
         var now = DateTime.Now;
         foreach (var (sessionId, session) in _activeSessions)
@@ -136,6 +138,7 @@ public sealed class SessionTracker
     {
         _isAwake = true;
         _logger.Information("System resuming from sleep");
+        _notifier.NotifyWake();
 
         var now = DateTime.Now;
         foreach (var (sessionId, session) in _activeSessions)

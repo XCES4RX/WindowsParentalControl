@@ -4,10 +4,14 @@
         xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:vm="clr-namespace:ParentalControl.Admin.ViewModels"
         xmlns:views="clr-namespace:ParentalControl.Admin.Views"
+        xmlns:services="clr-namespace:ParentalControl.Admin.Services"
         Icon="pack://application:,,,/icon.ico"
-        Title="Parental Control - Administration"
-        Height="700" Width="1100"
+        Title="{Binding [app_title], Source={x:Static services:LocalizedStrings.Instance}}"
+        FlowDirection="{Binding FlowDirection, Source={x:Static services:LocalizedStrings.Instance}}"
+        Height="730" Width="1120"
+        MinHeight="600" MinWidth="900"
         WindowStartupLocation="CenterScreen"
+        Background="#F8FAFC"
         Style="{StaticResource MaterialDesignWindow}">
     <Window.DataContext>
         <vm:MainViewModel />
@@ -25,50 +29,60 @@
     </Window.Resources>
 
     <DockPanel>
-        <DockPanel DockPanel.Dock="Top" Margin="16,4,16,2">
-            <Button DockPanel.Dock="Left"
-                    Command="{Binding OpenSettingsCommand}"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    Height="28" Padding="10,2"
-                    ToolTip="Configure Telegram Bot &amp; Child Countdown Overlay">
-                <StackPanel Orientation="Horizontal">
-                    <md:PackIcon Kind="CogOutline" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <TextBlock Text="Settings &amp; Telegram" FontSize="12" VerticalAlignment="Center" />
+        <!-- Sleek Top Application Bar -->
+        <Border DockPanel.Dock="Top" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="16,10">
+            <DockPanel LastChildFill="True">
+                <!-- Branding: Icon + Title + Subtitle -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border CornerRadius="8" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" Width="36" Height="36" Margin="0,0,12,0">
+                        <Image Source="pack://application:,,,/icon.ico" Width="24" Height="24" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding [app_title], Source={x:Static services:LocalizedStrings.Instance}}"
+                                   FontSize="15" FontWeight="Bold" Foreground="#0F172A" />
+                        <TextBlock Text="{Binding [app_subtitle], Source={x:Static services:LocalizedStrings.Instance}}"
+                                   FontSize="11" Foreground="#64748B" />
+                    </StackPanel>
                 </StackPanel>
-            </Button>
 
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-                        HorizontalAlignment="Right" VerticalAlignment="Center">
-                <TextBlock Text="{Binding TelegramStatusText}"
-                           Foreground="{Binding TelegramStatusColor}"
-                           FontSize="11" FontWeight="SemiBold"
-                           VerticalAlignment="Center" Margin="0,0,14,0" />
-                <TextBlock Text="{Binding ServiceStatusText}"
-                           Foreground="{Binding ServiceStatusColor}"
-                           FontSize="11" FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <md:PackIcon Kind="CircleSmall" Width="14" Height="14"
-                             Foreground="{Binding ServiceStatusColor}"
-                             VerticalAlignment="Center"
-                             Visibility="{Binding IsServiceRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <md:PackIcon Kind="Close" Width="11" Height="11"
-                             Foreground="{Binding ServiceStatusColor}"
-                             VerticalAlignment="Center"
-                             Margin="2,0,0,0">
-                    <md:PackIcon.Style>
-                        <Style TargetType="md:PackIcon">
-                            <Setter Property="Visibility" Value="Visible" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsServiceRunning}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </md:PackIcon.Style>
-                </md:PackIcon>
-            </StackPanel>
-        </DockPanel>
+                <!-- Right Side: Status Pills & Settings Button -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- Telegram Status Pill -->
+                    <Border Style="{StaticResource StatusPill}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <md:PackIcon Kind="Send" Width="13" Height="13" Foreground="{Binding TelegramStatusColor}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding TelegramStatusText}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{Binding TelegramStatusColor}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
+                    <!-- Service Status Pill -->
+                    <Border Style="{StaticResource StatusPill}" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{Binding ServiceStatusColor}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding ServiceStatusText}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{Binding ServiceStatusColor}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Settings Button -->
+                    <Button Command="{Binding OpenSettingsCommand}"
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Height="32" Padding="12,0"
+                            BorderBrush="#CBD5E1"
+                            BorderThickness="1"
+                            ToolTip="Settings &amp; Telegram">
+                        <StackPanel Orientation="Horizontal">
+                            <md:PackIcon Kind="CogOutline" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding [btn_settings], Source={x:Static services:LocalizedStrings.Instance}}"
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Dynamic Main Content -->
         <ContentControl Content="{Binding CurrentView}" />
     </DockPanel>
 </Window>

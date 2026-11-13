@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParentalControl.Admin.Services;
 using ParentalControl.Core.Data;
+using ParentalControl.Core.Localization;
 using ParentalControl.Core.Models;
 
 namespace ParentalControl.Admin.ViewModels;
@@ -21,7 +23,9 @@ public partial class UserRow : ObservableObject
     [ObservableProperty]
     private bool _isAdmin;
 
-    public string UserType => IsAdmin ? "Administrator" : "Standard User";
+    public string UserType => IsAdmin
+        ? LocalizationManager.T("admin_role_text", LocalizedStrings.Instance.CurrentLanguage)
+        : LocalizationManager.T("std_role_text", LocalizedStrings.Instance.CurrentLanguage);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LimitSummary))]
@@ -40,16 +44,20 @@ public partial class UserRow : ObservableObject
     private int _todayMinutesUsed;
 
     [ObservableProperty]
-    private string _restrictionsSummary = "No Windows restrictions";
+    private string _restrictionsSummary = string.Empty;
 
     public string LimitSummary
     {
         get
         {
-            if (!DailyMinutes.HasValue) return "No limits";
+            var lang = LocalizedStrings.Instance.CurrentLanguage;
+            if (!DailyMinutes.HasValue)
+            {
+                return LocalizationManager.T("summary_no_limit", lang);
+            }
             var total = DailyMinutes.Value;
             var remaining = Math.Max(0, total - TodayMinutesUsed);
-            return $"{FormatMinutes(total)} / day ({FormatMinutes(remaining)} remaining)";
+            return LocalizationManager.T("summary_limit_format", lang, total, remaining);
         }
     }
 
@@ -57,18 +65,13 @@ public partial class UserRow : ObservableObject
     {
         get
         {
+            var lang = LocalizedStrings.Instance.CurrentLanguage;
             if (ScheduleStart is not null && ScheduleEnd is not null)
-                return $"{ScheduleStart} - {ScheduleEnd}";
-            return "No schedule";
+            {
+                return LocalizationManager.T("summary_sched_format", lang, ScheduleStart, ScheduleEnd);
+            }
+            return LocalizationManager.T("summary_no_sched", lang);
         }
-    }
-
-    private static string FormatMinutes(int minutes)
-    {
-        if (minutes < 60) return $"{minutes}min";
-        var h = minutes / 60;
-        var m = minutes % 60;
-        return m > 0 ? $"{h}h {m}min" : $"{h}h";
     }
 
     public static UserRow ForAdmin(string sid, string username)
@@ -115,10 +118,11 @@ public partial class UserRow : ObservableObject
 
     public void RefreshRestrictionsSummary()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var policy = UserPolicyRepository.GetByUserId(Id);
         if (policy is null)
         {
-            RestrictionsSummary = "No Windows restrictions";
+            RestrictionsSummary = LocalizationManager.T("summary_no_restrictions", lang);
             return;
         }
 
@@ -126,9 +130,10 @@ public partial class UserRow : ObservableObject
                   + (policy.BlockSettings ? 1 : 0)
                   + (policy.BlockTaskManager ? 1 : 0)
                   + (policy.BlockCommandPrompt ? 1 : 0);
+
         RestrictionsSummary = count == 0
-            ? "No Windows restrictions"
-            : $"{count} Windows restriction{(count == 1 ? "" : "s")}";
+            ? LocalizationManager.T("summary_no_restrictions", lang)
+            : LocalizationManager.T("summary_restrictions_count", lang, count);
     }
 
     public void RefreshLimits()

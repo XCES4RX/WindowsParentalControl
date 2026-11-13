@@ -3,7 +3,9 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ParentalControl.Admin.Services;
 using ParentalControl.Core.Data;
+using ParentalControl.Core.Localization;
 
 namespace ParentalControl.Admin.ViewModels;
 
@@ -18,7 +20,7 @@ public partial class MainViewModel : ObservableObject
     private ObservableObject _currentView = null!;
 
     [ObservableProperty]
-    private string _serviceStatusText = "Service: ...";
+    private string _serviceStatusText = "...";
 
     [ObservableProperty]
     private SolidColorBrush _serviceStatusColor = Brushes.Gray;
@@ -27,7 +29,7 @@ public partial class MainViewModel : ObservableObject
     private bool _isServiceRunning;
 
     [ObservableProperty]
-    private string _telegramStatusText = "Telegram: Off";
+    private string _telegramStatusText = "...";
 
     [ObservableProperty]
     private SolidColorBrush _telegramStatusColor = Brushes.Gray;
@@ -42,33 +44,41 @@ public partial class MainViewModel : ObservableObject
         _serviceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _serviceTimer.Tick += (_, _) => UpdateServiceStatus();
         _serviceTimer.Start();
+
+        // Listen for language changes to refresh headers
+        LocalizedStrings.Instance.PropertyChanged += (_, _) =>
+        {
+            UpdateServiceStatus();
+            _dashboardVm.LoadAll();
+        };
     }
 
     public void StopServicePolling() => _serviceTimer.Stop();
 
     private void UpdateServiceStatus()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         try
         {
             using var sc = new ServiceController(ServiceName);
             sc.Refresh();
             if (sc.Status == ServiceControllerStatus.Running)
             {
-                ServiceStatusText = "Service: Up";
-                ServiceStatusColor = Brushes.Green;
+                ServiceStatusText = LocalizationManager.T("service_active", lang);
+                ServiceStatusColor = new SolidColorBrush(Color.FromRgb(16, 185, 129)); // Modern Emerald Green
                 IsServiceRunning = true;
             }
             else
             {
-                ServiceStatusText = "Service: Down";
-                ServiceStatusColor = Brushes.Red;
+                ServiceStatusText = LocalizationManager.T("service_down", lang);
+                ServiceStatusColor = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // Modern Crimson
                 IsServiceRunning = false;
             }
         }
         catch (InvalidOperationException)
         {
-            ServiceStatusText = "Service: Down";
-            ServiceStatusColor = Brushes.Red;
+            ServiceStatusText = LocalizationManager.T("service_down", lang);
+            ServiceStatusColor = new SolidColorBrush(Color.FromRgb(239, 68, 68));
             IsServiceRunning = false;
         }
 
@@ -77,28 +87,33 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateTelegramStatus()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         try
         {
             var settings = SettingsRepository.Get();
             if (settings.TelegramEnabled && !string.IsNullOrWhiteSpace(settings.TelegramBotToken))
             {
-                TelegramStatusText = string.IsNullOrWhiteSpace(settings.TelegramChatId)
-                    ? "Telegram: Pairing"
-                    : "Telegram: Active";
-                TelegramStatusColor = string.IsNullOrWhiteSpace(settings.TelegramChatId)
-                    ? Brushes.DarkOrange
-                    : Brushes.DodgerBlue;
+                if (string.IsNullOrWhiteSpace(settings.TelegramChatId))
+                {
+                    TelegramStatusText = LocalizationManager.T("telegram_pairing", lang);
+                    TelegramStatusColor = new SolidColorBrush(Color.FromRgb(245, 158, 11)); // Amber
+                }
+                else
+                {
+                    TelegramStatusText = LocalizationManager.T("telegram_active", lang);
+                    TelegramStatusColor = new SolidColorBrush(Color.FromRgb(14, 165, 233)); // Sky Blue
+                }
             }
             else
             {
-                TelegramStatusText = "Telegram: Off";
-                TelegramStatusColor = Brushes.Gray;
+                TelegramStatusText = LocalizationManager.T("telegram_off", lang);
+                TelegramStatusColor = new SolidColorBrush(Color.FromRgb(148, 163, 184)); // Slate gray
             }
         }
         catch
         {
-            TelegramStatusText = "Telegram: Off";
-            TelegramStatusColor = Brushes.Gray;
+            TelegramStatusText = LocalizationManager.T("telegram_off", lang);
+            TelegramStatusColor = new SolidColorBrush(Color.FromRgb(148, 163, 184));
         }
     }
 

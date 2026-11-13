@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ParentalControl.Admin.Services;
 using ParentalControl.Core.Data;
 using ParentalControl.Core.Models;
 using ParentalControl.Core.Platform;
@@ -91,10 +92,13 @@ public partial class UserDetailViewModel : ObservableObject
     [RelayCommand]
     private void SetUsage()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         if (EditableUsageMinutes < 0)
         {
-            MessageBox.Show("Usage minutes cannot be negative.", "Validation Error",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Usage minutes cannot be negative." :
+                       lang == "fr" ? "Les minutes d'utilisation ne peuvent pas être négatives." :
+                       "دقائق الاستخدام لا يمكن أن تكون قيمة سالبة.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -102,30 +106,42 @@ public partial class UserDetailViewModel : ObservableObject
         UsageRepository.SetUsage(User.Id, today, EditableUsageMinutes);
         User.RefreshUsage();
         EditableUsageMinutes = User.TodayMinutesUsed;
+
+        var success = lang == "en" ? "Today's usage updated." :
+                      lang == "fr" ? "Utilisation mise à jour." :
+                      "تم تحديث استخدام اليوم بنجاح.";
+        MessageBox.Show(success, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     [RelayCommand]
     private void SetLimits()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         if (!TimeOnly.TryParse(ScheduleStart, out var start) ||
             !TimeOnly.TryParse(ScheduleEnd, out var end))
         {
-            MessageBox.Show("Invalid time format. Use HH:mm (e.g., 08:00).", "Validation Error",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Invalid time format. Use HH:mm (e.g. 08:00)." :
+                       lang == "fr" ? "Format horaire invalide. Utilisez HH:mm (ex. 08:00)." :
+                       "صيغة الوقت غير صحيحة. استخدم HH:mm مثل 08:00.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         if (start >= end)
         {
-            MessageBox.Show("Schedule start must be before schedule end.", "Validation Error",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Schedule start must be before schedule end." :
+                       lang == "fr" ? "L'heure de début doit précéder l'heure de fin." :
+                       "يجب أن تكون بداية الجدول قبل نهايته.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         if (DailyMinutes < 1 || DailyMinutes > 1440)
         {
-            MessageBox.Show("Daily minutes must be between 1 and 1440 (24 hours).", "Validation Error",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Daily minutes must be between 1 and 1440." :
+                       lang == "fr" ? "Les minutes quotidiennes doivent être comprises entre 1 et 1440." :
+                       "الحد اليومي بالدقائق يجب أن يكون بين 1 و1440 دقيقة.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -140,16 +156,20 @@ public partial class UserDetailViewModel : ObservableObject
         User.IsRestricted = true;
         User.RefreshLimits();
 
-        MessageBox.Show("Limits saved successfully.", "Success",
-            MessageBoxButton.OK, MessageBoxImage.Information);
+        var ok = lang == "en" ? "Time limits saved successfully." :
+                 lang == "fr" ? "Limites de temps enregistrées avec succès." :
+                 "تم حفظ إعدادات الوقت والجدول بنجاح.";
+        MessageBox.Show(ok, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     [RelayCommand]
     private void RemoveLimits()
     {
-        var result = MessageBox.Show(
-            $"Remove all limits for {User.Username}? This will allow unrestricted access.",
-            "Confirm Remove Limits", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
+        var confirm = lang == "en" ? $"Remove all time limits for {User.Username}?" :
+                      lang == "fr" ? $"Supprimer toutes les limites de temps pour {User.Username} ?" :
+                      $"هل تريد حقاً إزالة كافة الحدود الزمنية للمستخدم {User.Username}؟";
+        var result = MessageBox.Show(confirm, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes) return;
 
         LimitRepository.Delete(User.Id);
@@ -165,6 +185,7 @@ public partial class UserDetailViewModel : ObservableObject
     [RelayCommand]
     private void SavePolicies()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var policy = new UserPolicyConfig
         {
             UserId = User.Id,
@@ -178,17 +199,23 @@ public partial class UserDetailViewModel : ObservableObject
         var appliedNow = WindowsPolicyManager.ApplyPolicies(User.Sid, policy);
 
         var status = appliedNow
-            ? "Restrictions saved and applied to the active user session."
-            : "Restrictions saved. They will apply automatically on the user's next sign-in.";
+            ? (lang == "en" ? "Restrictions saved and applied to active session." :
+               lang == "fr" ? "Restrictions enregistrées et appliquées à la session active." :
+               "تم حفظ القيود وتطبيقها فوراً على الجلسة النشطة.")
+            : (lang == "en" ? "Restrictions saved. They will apply on next sign-in." :
+               lang == "fr" ? "Restrictions enregistrées. Elles s'appliqueront à la prochaine connexion." :
+               "تم حفظ القيود. ستطبّق تلقائياً عند تسجيل الدخول القادم.");
         MessageBox.Show(status, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     [RelayCommand]
     private void ClearPolicies()
     {
-        var result = MessageBox.Show(
-            $"Clear all Windows restrictions for {User.Username}?",
-            "Confirm Clear Restrictions", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
+        var confirm = lang == "en" ? $"Clear all Windows restrictions for {User.Username}?" :
+                      lang == "fr" ? $"Supprimer toutes les restrictions Windows pour {User.Username} ?" :
+                      $"هل تريد إلغاء كافة قيود ويندوز للمستخدم {User.Username}؟";
+        var result = MessageBox.Show(confirm, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes) return;
 
         UserPolicyRepository.Delete(User.Id);
@@ -198,8 +225,10 @@ public partial class UserDetailViewModel : ObservableObject
         BlockCommandPrompt = false;
         WindowsPolicyManager.ApplyPolicies(User.Sid, null);
 
-        MessageBox.Show("Windows restrictions cleared.", "Success",
-            MessageBoxButton.OK, MessageBoxImage.Information);
+        var msg = lang == "en" ? "Windows restrictions cleared." :
+                  lang == "fr" ? "Restrictions Windows effacées." :
+                  "تم إلغاء كافة قيود ويندوز بنجاح.";
+        MessageBox.Show(msg, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void LoadPolicyFields()
@@ -217,20 +246,28 @@ public partial class UserDetailViewModel : ObservableObject
     [RelayCommand]
     private void SaveBlockedApps()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var names = BlockedAppsText.Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
         BlockedAppRepository.ReplaceAll(User.Id, names);
         BlockedAppsText = string.Join(", ", BlockedAppRepository.GetByUserId(User.Id));
-        MessageBox.Show("Blocked applications saved. Running blocked apps will be closed automatically within seconds.",
-            "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        var msg = lang == "en" ? "Blocked applications saved." :
+                  lang == "fr" ? "Applications bloquées enregistrées." :
+                  "تم حفظ قائمة التطبيقات المحظورة بنجاح.";
+        MessageBox.Show(msg, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     [RelayCommand]
     private void ClearBlockedApps()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         BlockedAppRepository.ReplaceAll(User.Id, []);
         BlockedAppsText = string.Empty;
-        MessageBox.Show("All blocked applications cleared.", "Success",
-            MessageBoxButton.OK, MessageBoxImage.Information);
+
+        var msg = lang == "en" ? "All blocked applications cleared." :
+                  lang == "fr" ? "Toutes les applications bloquées ont été effacées." :
+                  "تم مسح كافة التطبيقات المحظورة.";
+        MessageBox.Show(msg, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void LoadLimitFields()

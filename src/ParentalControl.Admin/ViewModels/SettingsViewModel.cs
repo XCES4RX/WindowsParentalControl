@@ -4,8 +4,10 @@ using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ParentalControl.Admin.Services;
 using ParentalControl.Core;
 using ParentalControl.Core.Data;
+using ParentalControl.Core.Localization;
 using ParentalControl.Core.Models;
 using ParentalControl.Core.Telegram;
 
@@ -79,6 +81,19 @@ public partial class SettingsViewModel : ObservableObject
         AutoUpdateEnabled = s.AutoUpdateEnabled;
         CurrentVersion = AppVersionInfo.VersionString;
         StatusMessage = string.Empty;
+
+        LocalizedStrings.Instance.ApplyLanguage(AppLanguage);
+    }
+
+    partial void OnAppLanguageChanged(string value)
+    {
+        LocalizedStrings.Instance.ApplyLanguage(value);
+        PersistSettings();
+    }
+
+    partial void OnTelegramLanguageChanged(string value)
+    {
+        PersistSettings();
     }
 
     [RelayCommand]
@@ -87,34 +102,44 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var token = SettingsRepository.NormalizeBotToken(TelegramBotInput);
         if (TelegramEnabled && string.IsNullOrWhiteSpace(token))
         {
-            MessageBox.Show("Please enter a valid Telegram Bot Token or API URL before enabling Telegram.",
-                "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Please enter a valid Telegram Bot Token or API URL before enabling Telegram." :
+                       lang == "fr" ? "Veuillez saisir un jeton de bot valide avant d'activer Telegram." :
+                       "يرجى إدخال رمز بوت تلغرام أو رابط الـ API قبل تفعيل الربط.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         TelegramBotInput = token;
         PersistSettings();
-        StatusMessage = "Settings saved successfully.";
-        MessageBox.Show("Settings saved. The background service picks up changes automatically.",
-            "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+        var savedMsg = lang == "en" ? "Settings saved successfully." :
+                       lang == "fr" ? "Paramètres enregistrés avec succès." :
+                       "تم حفظ الإعدادات بنجاح.";
+        StatusMessage = savedMsg;
+        MessageBox.Show(savedMsg, "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     [RelayCommand]
     private async Task TestAndSaveAsync()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var token = SettingsRepository.NormalizeBotToken(TelegramBotInput);
         if (string.IsNullOrWhiteSpace(token))
         {
-            MessageBox.Show("Enter a Telegram Bot Token or API URL first.",
-                "Missing Token", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Enter a Telegram Bot Token first." :
+                       lang == "fr" ? "Entrez d'abord un jeton de bot Telegram." :
+                       "أدخل رمز توكن البوت أولاً.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         IsBusy = true;
-        StatusMessage = "Connecting to Telegram Bot API...";
+        StatusMessage = lang == "en" ? "Connecting to Telegram Bot API..." :
+                        lang == "fr" ? "Connexion à l'API Telegram..." :
+                        "جاري الاتصال بـ Telegram Bot API...";
         try
         {
             var bot = await _telegramClient.GetMeAsync(token);
@@ -124,22 +149,25 @@ public partial class SettingsViewModel : ObservableObject
 
             if (!string.IsNullOrWhiteSpace(TelegramChatId))
             {
-                await _telegramClient.SendMessageAsync(
-                    token,
-                    TelegramChatId.Trim(),
-                    $"✅ <b>تم الاتصال بنجاح</b>\n🤖 البوت: @{bot.Username}\n🖥 الجهاز: <b>{Environment.MachineName}</b>");
-                StatusMessage = $"Connected to @{bot.Username} and sent test message.";
+                var testMsg = lang == "en" ? $"✅ <b>Connected successfully</b>\n🤖 Bot: @{bot.Username}\n🖥 Device: <b>{Environment.MachineName}</b>" :
+                              lang == "fr" ? $"✅ <b>Connexion réussie</b>\n🤖 Bot : @{bot.Username}\n🖥 Appareil : <b>{Environment.MachineName}</b>" :
+                              $"✅ <b>تم الاتصال بنجاح</b>\n🤖 البوت: @{bot.Username}\n🖥 الجهاز: <b>{Environment.MachineName}</b>";
+                await _telegramClient.SendMessageAsync(token, TelegramChatId.Trim(), testMsg);
+                StatusMessage = lang == "en" ? $"Connected to @{bot.Username} and sent test message." :
+                                lang == "fr" ? $"Connecté à @{bot.Username} et message test envoyé." :
+                                $"تم الاتصال بـ @{bot.Username} وإرسال رسالة اختبار.";
             }
             else
             {
-                StatusMessage = $"Bot @{bot.Username} verified! Now send /start to @{bot.Username} on Telegram, then click Detect Chat ID.";
+                StatusMessage = lang == "en" ? $"Bot @{bot.Username} verified! Send /start to @{bot.Username} on Telegram, then click Detect Chat ID." :
+                                lang == "fr" ? $"Bot @{bot.Username} vérifié ! Envoyez /start à @{bot.Username} puis cliquez sur Détecter." :
+                                $"تم التحقق من @{bot.Username}! أرسل /start للبوت ثم اضغط زر اكتشاف المعرف.";
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error: {ex.Message}";
-            MessageBox.Show($"Telegram test failed: {ex.Message}", "Telegram Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, "Telegram Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -150,24 +178,32 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task DetectChatIdAsync()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         var token = SettingsRepository.NormalizeBotToken(TelegramBotInput);
         if (string.IsNullOrWhiteSpace(token))
         {
-            MessageBox.Show("Enter your Bot Token or API URL first.",
-                "Missing Token", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var warn = lang == "en" ? "Enter your Bot Token first." :
+                       lang == "fr" ? "Entrez d'abord votre jeton de bot." :
+                       "أدخل رمز توكن البوت أولاً.";
+            MessageBox.Show(warn, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         IsBusy = true;
-        StatusMessage = "Checking recent Telegram messages...";
+        StatusMessage = lang == "en" ? "Checking recent Telegram messages..." :
+                        lang == "fr" ? "Recherche des messages récents..." :
+                        "جاري فحص رسائل تلغرام الأخيرة...";
         try
         {
             var updates = await _telegramClient.GetUpdatesAsync(token, offset: 0, timeoutSeconds: 0);
             var latest = updates.LastOrDefault(u => !string.IsNullOrWhiteSpace(u.ChatId));
             if (latest is null)
             {
-                StatusMessage = "No messages found yet. Open your bot in Telegram, press Start (/start), and click Detect Chat ID again.";
-                MessageBox.Show(StatusMessage, "Chat ID Not Found", MessageBoxButton.OK, MessageBoxImage.Information);
+                var notFound = lang == "en" ? "No messages found. Send /start to your bot in Telegram, then click Detect again." :
+                               lang == "fr" ? "Aucun message trouvé. Envoyez /start à votre bot puis réessayez." :
+                               "لم يتم العثور على رسائل. أرسل /start للبوت في تلغرام ثم اضغط اكتشاف مجدداً.";
+                StatusMessage = notFound;
+                MessageBox.Show(notFound, "Chat ID", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -176,18 +212,19 @@ public partial class SettingsViewModel : ObservableObject
             TelegramEnabled = true;
             PersistSettings();
 
-            await _telegramClient.SendMessageAsync(
-                token,
-                TelegramChatId,
-                $"✅ <b>تم ربط Chat ID بنجاح</b>\n🖥 الجهاز: <b>{Environment.MachineName}</b>");
+            var linkedMsg = lang == "en" ? $"✅ <b>Chat ID linked successfully</b>\n🖥 Device: <b>{Environment.MachineName}</b>" :
+                            lang == "fr" ? $"✅ <b>Chat ID associé avec succès</b>\n🖥 Appareil : <b>{Environment.MachineName}</b>" :
+                            $"✅ <b>تم ربط Chat ID بنجاح</b>\n🖥 الجهاز: <b>{Environment.MachineName}</b>";
+            await _telegramClient.SendMessageAsync(token, TelegramChatId, linkedMsg);
 
-            StatusMessage = $"Detected Chat ID {TelegramChatId} ({latest.SenderName}) and saved!";
+            StatusMessage = lang == "en" ? $"Detected Chat ID {TelegramChatId} and saved!" :
+                            lang == "fr" ? $"Chat ID {TelegramChatId} détecté et enregistré !" :
+                            $"تم اكتشاف Chat ID {TelegramChatId} وحفظه بنجاح!";
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error: {ex.Message}";
-            MessageBox.Show($"Could not detect Chat ID: {ex.Message}", "Telegram Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, "Telegram Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -198,8 +235,11 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task CheckUpdateAsync()
     {
+        var lang = LocalizedStrings.Instance.CurrentLanguage;
         IsBusy = true;
-        StatusMessage = "Checking GitHub for updates...";
+        StatusMessage = lang == "en" ? "Checking GitHub for updates..." :
+                        lang == "fr" ? "Vérification des mises à jour sur GitHub..." :
+                        "جاري فحص التحديثات على GitHub...";
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -211,8 +251,7 @@ public partial class SettingsViewModel : ObservableObject
             using var resp = await http.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
             {
-                StatusMessage = $"GitHub API responded with code {resp.StatusCode}.";
-                MessageBox.Show(StatusMessage, "Check Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusMessage = $"GitHub API: {resp.StatusCode}";
                 return;
             }
 
@@ -224,21 +263,24 @@ public partial class SettingsViewModel : ObservableObject
 
             if (Version.TryParse(cleaned, out var remoteVer) && remoteVer > AppVersionInfo.CurrentVersion)
             {
-                StatusMessage = $"New release available: {tagName}!";
-                MessageBox.Show($"New version {tagName} is available on GitHub!\nAutomatic updater will install it silently.",
-                    "Update Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusMessage = LocalizationManager.T("update_available", lang, tagName);
+                var alert = lang == "en" ? $"New version {tagName} is available!\nAutomatic updater will install it silently." :
+                            lang == "fr" ? $"Nouvelle version {tagName} disponible !\nLe programme sera mis à jour silencieusement." :
+                            $"الإصدار الجديد {tagName} متاح الآن!\nسيقوم المحدث التلقائي بتثبيته بصمت.";
+                MessageBox.Show(alert, "Update Available", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                StatusMessage = $"You are running the latest version (v{AppVersionInfo.VersionString}).";
-                MessageBox.Show(StatusMessage, "Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusMessage = LocalizationManager.T("update_no_new", lang, AppVersionInfo.VersionString);
+                var upToDate = lang == "en" ? $"You are running the latest version (v{AppVersionInfo.VersionString})." :
+                               lang == "fr" ? $"Vous utilisez la dernière version (v{AppVersionInfo.VersionString})." :
+                               $"أنت تستخدم بالفعل أحدث إصدار (v{AppVersionInfo.VersionString}).";
+                MessageBox.Show(upToDate, "Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Check failed: {ex.Message}";
-            MessageBox.Show($"Could not check for updates: {ex.Message}", "Update Error",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {

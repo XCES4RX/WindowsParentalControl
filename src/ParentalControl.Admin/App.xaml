@@ -7,10 +7,28 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <md:BundledTheme BaseTheme="Light"
-                                PrimaryColor="Indigo"
-                                SecondaryColor="Amber" />
+                                PrimaryColor="Cobalt"
+                                SecondaryColor="Teal" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Global modern card style -->
+            <Style x:Key="ModernCard" TargetType="md:Card">
+                <Setter Property="Background" Value="#FFFFFF" />
+                <Setter Property="BorderBrush" Value="#E2E8F0" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="UniformCornerRadius" Value="12" />
+                <Setter Property="md:ElevationAssist.Elevation" Value="Dp1" />
+            </Style>
+
+            <!-- Status Pill Style -->
+            <Style x:Key="StatusPill" TargetType="Border">
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="Background" Value="#F1F5F9" />
+                <Setter Property="BorderBrush" Value="#E2E8F0" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
